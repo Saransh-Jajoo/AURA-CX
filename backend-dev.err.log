@@ -1,0 +1,1567 @@
+INFO:     Will watch for changes in these directories: ['D:\\Projects\\AURA-CX\\backend']
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process [5048] using WatchFiles
+INFO:     Started server process [8404]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     ('127.0.0.1', 59908) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     ('127.0.0.1', 55628) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+WARNING:  WatchFiles detected changes in 'config.py'. Reloading...
+INFO:     Shutting down
+INFO:     connection closed
+INFO:     connection closed
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [8404]
+WARNING:  WatchFiles detected changes in 'routers\subscriptions.py', 'services\ai_service.py', 'routers\integrations.py', 'config.py', 'main.py', 'routers\auth.py'. Reloading...
+(trapped) error reading bcrypt version
+Traceback (most recent call last):
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\passlib\handlers\bcrypt.py", line 620, in _load_backend_mixin
+    version = _bcrypt.__about__.__version__
+              ^^^^^^^^^^^^^^^^^
+AttributeError: module 'bcrypt' has no attribute '__about__'
+Process SpawnProcess-3:
+Traceback (most recent call last):
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\multiprocessing\process.py", line 313, in _bootstrap
+    self.run()
+    ~~~~~~~~^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\multiprocessing\process.py", line 108, in run
+    self._target(*self._args, **self._kwargs)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\uvicorn\_subprocess.py", line 80, in subprocess_started
+    target(sockets=sockets)
+    ~~~~~~^^^^^^^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\uvicorn\server.py", line 65, in run
+    return asyncio.run(self.serve(sockets=sockets))
+           ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\asyncio\runners.py", line 195, in run
+    return runner.run(main)
+           ~~~~~~~~~~^^^^^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\asyncio\runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\asyncio\base_events.py", line 725, in run_until_complete
+    return future.result()
+           ~~~~~~~~~~~~~^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\uvicorn\server.py", line 69, in serve
+    await self._serve(sockets)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\uvicorn\server.py", line 76, in _serve
+    config.load()
+    ~~~~~~~~~~~^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\uvicorn\config.py", line 434, in load
+    self.loaded_app = import_from_string(self.app)
+                      ~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\uvicorn\importer.py", line 19, in import_from_string
+    module = importlib.import_module(module_str)
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\importlib\__init__.py", line 88, in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<frozen importlib._bootstrap>", line 1387, in _gcd_import
+  File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 1023, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "D:\Projects\AURA-CX\backend\main.py", line 16, in <module>
+    from routers import ingestion, tickets, profiles, analytics, auth, subscriptions, integrations
+  File "D:\Projects\AURA-CX\backend\routers\auth.py", line 52, in <module>
+    "hashed_password": pwd_context.hash("admin123"),
+                       ~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\passlib\context.py", line 2258, in hash
+    return record.hash(secret, **kwds)
+           ~~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\passlib\utils\handlers.py", line 779, in hash
+    self.checksum = self._calc_checksum(secret)
+                    ~~~~~~~~~~~~~~~~~~~^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\passlib\handlers\bcrypt.py", line 591, in _calc_checksum
+    self._stub_requires_backend()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\passlib\utils\handlers.py", line 2254, in _stub_requires_backend
+    cls.set_backend()
+    ~~~~~~~~~~~~~~~^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\passlib\utils\handlers.py", line 2156, in set_backend
+    return owner.set_backend(name, dryrun=dryrun)
+           ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\passlib\utils\handlers.py", line 2163, in set_backend
+    return cls.set_backend(name, dryrun=dryrun)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\passlib\utils\handlers.py", line 2188, in set_backend
+    cls._set_backend(name, dryrun)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\passlib\utils\handlers.py", line 2311, in _set_backend
+    super(SubclassBackendMixin, cls)._set_backend(name, dryrun)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\passlib\utils\handlers.py", line 2224, in _set_backend
+    ok = loader(**kwds)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\passlib\handlers\bcrypt.py", line 626, in _load_backend_mixin
+    return mixin_cls._finalize_backend_mixin(name, dryrun)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\passlib\handlers\bcrypt.py", line 421, in _finalize_backend_mixin
+    if detect_wrap_bug(IDENT_2A):
+       ~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\passlib\handlers\bcrypt.py", line 380, in detect_wrap_bug
+    if verify(secret, bug_hash):
+       ~~~~~~^^^^^^^^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\passlib\utils\handlers.py", line 792, in verify
+    return consteq(self._calc_checksum(secret), chk)
+                   ~~~~~~~~~~~~~~~~~~~^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\passlib\handlers\bcrypt.py", line 655, in _calc_checksum
+    hash = _bcrypt.hashpw(secret, config)
+ValueError: password cannot be longer than 72 bytes, truncate manually if necessary (e.g. my_password[:72])
+WARNING:  WatchFiles detected changes in 'routers\subscriptions.py', 'services\ai_service.py', 'routers\integrations.py', 'config.py', 'main.py', 'routers\auth.py'. Reloading...
+(trapped) error reading bcrypt version
+Traceback (most recent call last):
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\passlib\handlers\bcrypt.py", line 620, in _load_backend_mixin
+    version = _bcrypt.__about__.__version__
+              ^^^^^^^^^^^^^^^^^
+AttributeError: module 'bcrypt' has no attribute '__about__'
+Process SpawnProcess-4:
+Traceback (most recent call last):
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\multiprocessing\process.py", line 313, in _bootstrap
+    self.run()
+    ~~~~~~~~^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\multiprocessing\process.py", line 108, in run
+    self._target(*self._args, **self._kwargs)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\uvicorn\_subprocess.py", line 80, in subprocess_started
+    target(sockets=sockets)
+    ~~~~~~^^^^^^^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\uvicorn\server.py", line 65, in run
+    return asyncio.run(self.serve(sockets=sockets))
+           ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\asyncio\runners.py", line 195, in run
+    return runner.run(main)
+           ~~~~~~~~~~^^^^^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\asyncio\runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\asyncio\base_events.py", line 725, in run_until_complete
+    return future.result()
+           ~~~~~~~~~~~~~^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\uvicorn\server.py", line 69, in serve
+    await self._serve(sockets)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\uvicorn\server.py", line 76, in _serve
+    config.load()
+    ~~~~~~~~~~~^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\uvicorn\config.py", line 434, in load
+    self.loaded_app = import_from_string(self.app)
+                      ~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\uvicorn\importer.py", line 19, in import_from_string
+    module = importlib.import_module(module_str)
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\importlib\__init__.py", line 88, in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<frozen importlib._bootstrap>", line 1387, in _gcd_import
+  File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 1023, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "D:\Projects\AURA-CX\backend\main.py", line 16, in <module>
+    from routers import ingestion, tickets, profiles, analytics, auth, subscriptions, integrations
+  File "D:\Projects\AURA-CX\backend\routers\auth.py", line 52, in <module>
+    "hashed_password": pwd_context.hash("admin123"),
+                       ~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\passlib\context.py", line 2258, in hash
+    return record.hash(secret, **kwds)
+           ~~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\passlib\utils\handlers.py", line 779, in hash
+    self.checksum = self._calc_checksum(secret)
+                    ~~~~~~~~~~~~~~~~~~~^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\passlib\handlers\bcrypt.py", line 591, in _calc_checksum
+    self._stub_requires_backend()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\passlib\utils\handlers.py", line 2254, in _stub_requires_backend
+    cls.set_backend()
+    ~~~~~~~~~~~~~~~^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\passlib\utils\handlers.py", line 2156, in set_backend
+    return owner.set_backend(name, dryrun=dryrun)
+           ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\passlib\utils\handlers.py", line 2163, in set_backend
+    return cls.set_backend(name, dryrun=dryrun)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\passlib\utils\handlers.py", line 2188, in set_backend
+    cls._set_backend(name, dryrun)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\passlib\utils\handlers.py", line 2311, in _set_backend
+    super(SubclassBackendMixin, cls)._set_backend(name, dryrun)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\passlib\utils\handlers.py", line 2224, in _set_backend
+    ok = loader(**kwds)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\passlib\handlers\bcrypt.py", line 626, in _load_backend_mixin
+    return mixin_cls._finalize_backend_mixin(name, dryrun)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\passlib\handlers\bcrypt.py", line 421, in _finalize_backend_mixin
+    if detect_wrap_bug(IDENT_2A):
+       ~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\passlib\handlers\bcrypt.py", line 380, in detect_wrap_bug
+    if verify(secret, bug_hash):
+       ~~~~~~^^^^^^^^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\passlib\utils\handlers.py", line 792, in verify
+    return consteq(self._calc_checksum(secret), chk)
+                   ~~~~~~~~~~~~~~~~~~~^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\passlib\handlers\bcrypt.py", line 655, in _calc_checksum
+    hash = _bcrypt.hashpw(secret, config)
+ValueError: password cannot be longer than 72 bytes, truncate manually if necessary (e.g. my_password[:72])
+WARNING:  WatchFiles detected changes in 'routers\auth.py'. Reloading...
+INFO:     Started server process [7472]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     ('127.0.0.1', 52213) - "WebSocket /ws/live-feed" [accepted]
+INFO:     ('127.0.0.1', 51752) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection closed
+INFO:     connection closed
+ERROR:    Exception in ASGI application
+Traceback (most recent call last):
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\uvicorn\protocols\websockets\websockets_impl.py", line 332, in asgi_send
+    await self.send(data)  # type: ignore[arg-type]
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\websockets\legacy\protocol.py", line 635, in send
+    await self.ensure_open()
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\websockets\legacy\protocol.py", line 939, in ensure_open
+    raise self.connection_closed_exc()
+websockets.exceptions.ConnectionClosedError: no close frame received or sent
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\websockets.py", line 85, in send
+    await self._send(message)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\_exception_handler.py", line 48, in sender
+    await send(message)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\uvicorn\protocols\websockets\websockets_impl.py", line 345, in asgi_send
+    raise ClientDisconnected from exc
+uvicorn.protocols.utils.ClientDisconnected
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\uvicorn\protocols\websockets\websockets_impl.py", line 244, in run_asgi
+    result = await self.app(self.scope, self.asgi_receive, self.asgi_send)  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\uvicorn\middleware\proxy_headers.py", line 70, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\fastapi\applications.py", line 1054, in __call__
+    await super().__call__(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\applications.py", line 113, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\middleware\errors.py", line 152, in __call__
+    await self.app(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\middleware\cors.py", line 77, in __call__
+    await self.app(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\middleware\exceptions.py", line 62, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\_exception_handler.py", line 62, in wrapped_app
+    raise exc
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\_exception_handler.py", line 51, in wrapped_app
+    await app(scope, receive, sender)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 715, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 735, in app
+    await route.handle(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 362, in handle
+    await self.app(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 95, in app
+    await wrap_app_handling_exceptions(app, session)(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\_exception_handler.py", line 62, in wrapped_app
+    raise exc
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\_exception_handler.py", line 51, in wrapped_app
+    await app(scope, receive, sender)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 93, in app
+    await func(session)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\fastapi\routing.py", line 383, in app
+    await dependant.call(**solved_result.values)
+  File "D:\Projects\AURA-CX\backend\main.py", line 106, in websocket_endpoint
+    await websocket.send_json({"type": "ticket_batch", "tickets": initial_tickets})
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\websockets.py", line 175, in send_json
+    await self.send({"type": "websocket.send", "text": text})
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\websockets.py", line 88, in send
+    raise WebSocketDisconnect(code=1006)
+starlette.websockets.WebSocketDisconnect
+ERROR:    Exception in ASGI application
+Traceback (most recent call last):
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\uvicorn\protocols\websockets\websockets_impl.py", line 332, in asgi_send
+    await self.send(data)  # type: ignore[arg-type]
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\websockets\legacy\protocol.py", line 635, in send
+    await self.ensure_open()
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\websockets\legacy\protocol.py", line 939, in ensure_open
+    raise self.connection_closed_exc()
+websockets.exceptions.ConnectionClosedError: no close frame received or sent
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\websockets.py", line 85, in send
+    await self._send(message)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\_exception_handler.py", line 48, in sender
+    await send(message)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\uvicorn\protocols\websockets\websockets_impl.py", line 345, in asgi_send
+    raise ClientDisconnected from exc
+uvicorn.protocols.utils.ClientDisconnected
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\uvicorn\protocols\websockets\websockets_impl.py", line 244, in run_asgi
+    result = await self.app(self.scope, self.asgi_receive, self.asgi_send)  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\uvicorn\middleware\proxy_headers.py", line 70, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\fastapi\applications.py", line 1054, in __call__
+    await super().__call__(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\applications.py", line 113, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\middleware\errors.py", line 152, in __call__
+    await self.app(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\middleware\cors.py", line 77, in __call__
+    await self.app(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\middleware\exceptions.py", line 62, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\_exception_handler.py", line 62, in wrapped_app
+    raise exc
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\_exception_handler.py", line 51, in wrapped_app
+    await app(scope, receive, sender)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 715, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 735, in app
+    await route.handle(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 362, in handle
+    await self.app(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 95, in app
+    await wrap_app_handling_exceptions(app, session)(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\_exception_handler.py", line 62, in wrapped_app
+    raise exc
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\_exception_handler.py", line 51, in wrapped_app
+    await app(scope, receive, sender)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 93, in app
+    await func(session)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\fastapi\routing.py", line 383, in app
+    await dependant.call(**solved_result.values)
+  File "D:\Projects\AURA-CX\backend\main.py", line 106, in websocket_endpoint
+    await websocket.send_json({"type": "ticket_batch", "tickets": initial_tickets})
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\websockets.py", line 175, in send_json
+    await self.send({"type": "websocket.send", "text": text})
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\websockets.py", line 88, in send
+    raise WebSocketDisconnect(code=1006)
+starlette.websockets.WebSocketDisconnect
+WARNING:  WatchFiles detected changes in 'routers\auth.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [7472]
+INFO:     Started server process [8196]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'routers\auth.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [8196]
+WARNING:  WatchFiles detected changes in 'routers\auth.py'. Reloading...
+INFO:     Started server process [5248]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     ('127.0.0.1', 49864) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     ('127.0.0.1', 52731) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     ('127.0.0.1', 62944) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     ('127.0.0.1', 54647) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     ('127.0.0.1', 50154) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     ('127.0.0.1', 53289) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     ('127.0.0.1', 58059) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     ('127.0.0.1', 63372) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     ('127.0.0.1', 49314) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     ('127.0.0.1', 59046) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     ('127.0.0.1', 56785) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     ('127.0.0.1', 50549) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     connection closed
+INFO:     connection closed
+INFO:     connection closed
+INFO:     connection closed
+INFO:     connection closed
+INFO:     connection closed
+INFO:     connection closed
+INFO:     ('127.0.0.1', 50277) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     ('127.0.0.1', 64943) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     ('127.0.0.1', 58064) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     ('127.0.0.1', 64664) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     ('127.0.0.1', 54442) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     ('127.0.0.1', 49290) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     ('127.0.0.1', 49929) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     ('127.0.0.1', 57946) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     ('127.0.0.1', 56161) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     connection closed
+INFO:     connection closed
+INFO:     connection closed
+INFO:     connection closed
+INFO:     connection closed
+INFO:     connection closed
+INFO:     connection closed
+INFO:     ('127.0.0.1', 54857) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     ('127.0.0.1', 49781) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     ('127.0.0.1', 56792) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     ('127.0.0.1', 60189) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     ('127.0.0.1', 57031) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     ('127.0.0.1', 56142) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     ('127.0.0.1', 51351) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     ('127.0.0.1', 53885) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     connection closed
+INFO:     connection closed
+INFO:     connection closed
+INFO:     connection closed
+INFO:     connection closed
+INFO:     connection closed
+INFO:     connection closed
+INFO:     ('127.0.0.1', 50838) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     ('127.0.0.1', 60531) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     ('127.0.0.1', 55930) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     ('127.0.0.1', 49885) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     ('127.0.0.1', 58530) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     ('127.0.0.1', 55945) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     ('127.0.0.1', 50092) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     ('127.0.0.1', 54250) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     connection closed
+INFO:     connection closed
+INFO:     connection closed
+INFO:     connection closed
+ERROR:    Exception in ASGI application
+Traceback (most recent call last):
+  File "D:\Projects\AURA-CX\backend\main.py", line 111, in websocket_endpoint
+    data = await websocket.receive_text()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\websockets.py", line 119, in receive_text
+    self._raise_on_disconnect(message)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\websockets.py", line 113, in _raise_on_disconnect
+    raise WebSocketDisconnect(message["code"], message.get("reason"))
+starlette.websockets.WebSocketDisconnect: (<CloseCode.ABNORMAL_CLOSURE: 1006>, None)
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\uvicorn\protocols\websockets\websockets_impl.py", line 244, in run_asgi
+    result = await self.app(self.scope, self.asgi_receive, self.asgi_send)  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\uvicorn\middleware\proxy_headers.py", line 70, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\fastapi\applications.py", line 1054, in __call__
+    await super().__call__(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\applications.py", line 113, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\middleware\errors.py", line 152, in __call__
+    await self.app(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\middleware\cors.py", line 77, in __call__
+    await self.app(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\middleware\exceptions.py", line 62, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\_exception_handler.py", line 62, in wrapped_app
+    raise exc
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\_exception_handler.py", line 51, in wrapped_app
+    await app(scope, receive, sender)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 715, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 735, in app
+    await route.handle(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 362, in handle
+    await self.app(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 95, in app
+    await wrap_app_handling_exceptions(app, session)(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\_exception_handler.py", line 62, in wrapped_app
+    raise exc
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\_exception_handler.py", line 51, in wrapped_app
+    await app(scope, receive, sender)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 93, in app
+    await func(session)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\fastapi\routing.py", line 383, in app
+    await dependant.call(**solved_result.values)
+  File "D:\Projects\AURA-CX\backend\main.py", line 115, in websocket_endpoint
+    manager.disconnect(websocket)
+    ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\backend\main.py", line 29, in disconnect
+    self.active_connections.remove(websocket)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+ValueError: list.remove(x): x not in list
+INFO:     connection closed
+ERROR:    Exception in ASGI application
+Traceback (most recent call last):
+  File "D:\Projects\AURA-CX\backend\main.py", line 111, in websocket_endpoint
+    data = await websocket.receive_text()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\websockets.py", line 119, in receive_text
+    self._raise_on_disconnect(message)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\websockets.py", line 113, in _raise_on_disconnect
+    raise WebSocketDisconnect(message["code"], message.get("reason"))
+starlette.websockets.WebSocketDisconnect: (<CloseCode.ABNORMAL_CLOSURE: 1006>, None)
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\uvicorn\protocols\websockets\websockets_impl.py", line 244, in run_asgi
+    result = await self.app(self.scope, self.asgi_receive, self.asgi_send)  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\uvicorn\middleware\proxy_headers.py", line 70, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\fastapi\applications.py", line 1054, in __call__
+    await super().__call__(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\applications.py", line 113, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\middleware\errors.py", line 152, in __call__
+    await self.app(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\middleware\cors.py", line 77, in __call__
+    await self.app(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\middleware\exceptions.py", line 62, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\_exception_handler.py", line 62, in wrapped_app
+    raise exc
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\_exception_handler.py", line 51, in wrapped_app
+    await app(scope, receive, sender)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 715, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 735, in app
+    await route.handle(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 362, in handle
+    await self.app(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 95, in app
+    await wrap_app_handling_exceptions(app, session)(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\_exception_handler.py", line 62, in wrapped_app
+    raise exc
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\_exception_handler.py", line 51, in wrapped_app
+    await app(scope, receive, sender)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 93, in app
+    await func(session)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\fastapi\routing.py", line 383, in app
+    await dependant.call(**solved_result.values)
+  File "D:\Projects\AURA-CX\backend\main.py", line 115, in websocket_endpoint
+    manager.disconnect(websocket)
+    ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\backend\main.py", line 29, in disconnect
+    self.active_connections.remove(websocket)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+ValueError: list.remove(x): x not in list
+INFO:     connection closed
+ERROR:    Exception in ASGI application
+Traceback (most recent call last):
+  File "D:\Projects\AURA-CX\backend\main.py", line 111, in websocket_endpoint
+    data = await websocket.receive_text()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\websockets.py", line 119, in receive_text
+    self._raise_on_disconnect(message)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\websockets.py", line 113, in _raise_on_disconnect
+    raise WebSocketDisconnect(message["code"], message.get("reason"))
+starlette.websockets.WebSocketDisconnect: (<CloseCode.ABNORMAL_CLOSURE: 1006>, None)
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\uvicorn\protocols\websockets\websockets_impl.py", line 244, in run_asgi
+    result = await self.app(self.scope, self.asgi_receive, self.asgi_send)  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\uvicorn\middleware\proxy_headers.py", line 70, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\fastapi\applications.py", line 1054, in __call__
+    await super().__call__(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\applications.py", line 113, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\middleware\errors.py", line 152, in __call__
+    await self.app(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\middleware\cors.py", line 77, in __call__
+    await self.app(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\middleware\exceptions.py", line 62, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\_exception_handler.py", line 62, in wrapped_app
+    raise exc
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\_exception_handler.py", line 51, in wrapped_app
+    await app(scope, receive, sender)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 715, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 735, in app
+    await route.handle(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 362, in handle
+    await self.app(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 95, in app
+    await wrap_app_handling_exceptions(app, session)(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\_exception_handler.py", line 62, in wrapped_app
+    raise exc
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\_exception_handler.py", line 51, in wrapped_app
+    await app(scope, receive, sender)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 93, in app
+    await func(session)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\fastapi\routing.py", line 383, in app
+    await dependant.call(**solved_result.values)
+  File "D:\Projects\AURA-CX\backend\main.py", line 115, in websocket_endpoint
+    manager.disconnect(websocket)
+    ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\backend\main.py", line 29, in disconnect
+    self.active_connections.remove(websocket)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+ValueError: list.remove(x): x not in list
+INFO:     connection closed
+INFO:     ('127.0.0.1', 63994) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     ('127.0.0.1', 64310) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     ('127.0.0.1', 54048) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     ('127.0.0.1', 56029) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     ('127.0.0.1', 59910) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     ('127.0.0.1', 59175) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     ('127.0.0.1', 59494) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     ('127.0.0.1', 57060) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     connection closed
+INFO:     connection closed
+INFO:     connection closed
+INFO:     connection closed
+INFO:     connection closed
+INFO:     connection closed
+INFO:     connection closed
+INFO:     ('127.0.0.1', 52263) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     ('127.0.0.1', 55698) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     ('127.0.0.1', 52732) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     ('127.0.0.1', 50470) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     ('127.0.0.1', 60212) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     ('127.0.0.1', 55959) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     ('127.0.0.1', 58855) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     ('127.0.0.1', 65231) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     connection closed
+INFO:     connection closed
+INFO:     connection closed
+INFO:     connection closed
+INFO:     connection closed
+INFO:     connection closed
+INFO:     connection closed
+INFO:     ('127.0.0.1', 53040) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     ('127.0.0.1', 58283) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     ('127.0.0.1', 56628) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     ('127.0.0.1', 62375) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     ('127.0.0.1', 49996) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     ('127.0.0.1', 64843) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     ('127.0.0.1', 62224) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     ('127.0.0.1', 62839) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     connection closed
+INFO:     connection closed
+INFO:     connection closed
+INFO:     connection closed
+INFO:     connection closed
+INFO:     connection closed
+INFO:     connection closed
+INFO:     ('127.0.0.1', 53785) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     ('127.0.0.1', 65492) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     ('127.0.0.1', 52648) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     ('127.0.0.1', 61763) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     ('127.0.0.1', 61073) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     ('127.0.0.1', 55771) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     ('127.0.0.1', 56301) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     ('127.0.0.1', 53361) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     connection closed
+ERROR:    Exception in ASGI application
+Traceback (most recent call last):
+  File "D:\Projects\AURA-CX\backend\main.py", line 111, in websocket_endpoint
+    data = await websocket.receive_text()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\websockets.py", line 119, in receive_text
+    self._raise_on_disconnect(message)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\websockets.py", line 113, in _raise_on_disconnect
+    raise WebSocketDisconnect(message["code"], message.get("reason"))
+starlette.websockets.WebSocketDisconnect: (<CloseCode.ABNORMAL_CLOSURE: 1006>, None)
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\uvicorn\protocols\websockets\websockets_impl.py", line 244, in run_asgi
+    result = await self.app(self.scope, self.asgi_receive, self.asgi_send)  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\uvicorn\middleware\proxy_headers.py", line 70, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\fastapi\applications.py", line 1054, in __call__
+    await super().__call__(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\applications.py", line 113, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\middleware\errors.py", line 152, in __call__
+    await self.app(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\middleware\cors.py", line 77, in __call__
+    await self.app(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\middleware\exceptions.py", line 62, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\_exception_handler.py", line 62, in wrapped_app
+    raise exc
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\_exception_handler.py", line 51, in wrapped_app
+    await app(scope, receive, sender)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 715, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 735, in app
+    await route.handle(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 362, in handle
+    await self.app(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 95, in app
+    await wrap_app_handling_exceptions(app, session)(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\_exception_handler.py", line 62, in wrapped_app
+    raise exc
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\_exception_handler.py", line 51, in wrapped_app
+    await app(scope, receive, sender)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 93, in app
+    await func(session)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\fastapi\routing.py", line 383, in app
+    await dependant.call(**solved_result.values)
+  File "D:\Projects\AURA-CX\backend\main.py", line 115, in websocket_endpoint
+    manager.disconnect(websocket)
+    ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\backend\main.py", line 29, in disconnect
+    self.active_connections.remove(websocket)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+ValueError: list.remove(x): x not in list
+INFO:     connection closed
+ERROR:    Exception in ASGI application
+Traceback (most recent call last):
+  File "D:\Projects\AURA-CX\backend\main.py", line 111, in websocket_endpoint
+    data = await websocket.receive_text()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\websockets.py", line 119, in receive_text
+    self._raise_on_disconnect(message)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\websockets.py", line 113, in _raise_on_disconnect
+    raise WebSocketDisconnect(message["code"], message.get("reason"))
+starlette.websockets.WebSocketDisconnect: (<CloseCode.ABNORMAL_CLOSURE: 1006>, None)
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\uvicorn\protocols\websockets\websockets_impl.py", line 244, in run_asgi
+    result = await self.app(self.scope, self.asgi_receive, self.asgi_send)  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\uvicorn\middleware\proxy_headers.py", line 70, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\fastapi\applications.py", line 1054, in __call__
+    await super().__call__(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\applications.py", line 113, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\middleware\errors.py", line 152, in __call__
+    await self.app(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\middleware\cors.py", line 77, in __call__
+    await self.app(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\middleware\exceptions.py", line 62, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\_exception_handler.py", line 62, in wrapped_app
+    raise exc
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\_exception_handler.py", line 51, in wrapped_app
+    await app(scope, receive, sender)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 715, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 735, in app
+    await route.handle(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 362, in handle
+    await self.app(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 95, in app
+    await wrap_app_handling_exceptions(app, session)(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\_exception_handler.py", line 62, in wrapped_app
+    raise exc
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\_exception_handler.py", line 51, in wrapped_app
+    await app(scope, receive, sender)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 93, in app
+    await func(session)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\fastapi\routing.py", line 383, in app
+    await dependant.call(**solved_result.values)
+  File "D:\Projects\AURA-CX\backend\main.py", line 115, in websocket_endpoint
+    manager.disconnect(websocket)
+    ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\backend\main.py", line 29, in disconnect
+    self.active_connections.remove(websocket)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+ValueError: list.remove(x): x not in list
+INFO:     connection closed
+ERROR:    Exception in ASGI application
+Traceback (most recent call last):
+  File "D:\Projects\AURA-CX\backend\main.py", line 111, in websocket_endpoint
+    data = await websocket.receive_text()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\websockets.py", line 119, in receive_text
+    self._raise_on_disconnect(message)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\websockets.py", line 113, in _raise_on_disconnect
+    raise WebSocketDisconnect(message["code"], message.get("reason"))
+starlette.websockets.WebSocketDisconnect: (<CloseCode.ABNORMAL_CLOSURE: 1006>, None)
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\uvicorn\protocols\websockets\websockets_impl.py", line 244, in run_asgi
+    result = await self.app(self.scope, self.asgi_receive, self.asgi_send)  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\uvicorn\middleware\proxy_headers.py", line 70, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\fastapi\applications.py", line 1054, in __call__
+    await super().__call__(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\applications.py", line 113, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\middleware\errors.py", line 152, in __call__
+    await self.app(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\middleware\cors.py", line 77, in __call__
+    await self.app(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\middleware\exceptions.py", line 62, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\_exception_handler.py", line 62, in wrapped_app
+    raise exc
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\_exception_handler.py", line 51, in wrapped_app
+    await app(scope, receive, sender)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 715, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 735, in app
+    await route.handle(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 362, in handle
+    await self.app(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 95, in app
+    await wrap_app_handling_exceptions(app, session)(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\_exception_handler.py", line 62, in wrapped_app
+    raise exc
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\_exception_handler.py", line 51, in wrapped_app
+    await app(scope, receive, sender)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 93, in app
+    await func(session)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\fastapi\routing.py", line 383, in app
+    await dependant.call(**solved_result.values)
+  File "D:\Projects\AURA-CX\backend\main.py", line 115, in websocket_endpoint
+    manager.disconnect(websocket)
+    ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\backend\main.py", line 29, in disconnect
+    self.active_connections.remove(websocket)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+ValueError: list.remove(x): x not in list
+INFO:     connection closed
+ERROR:    Exception in ASGI application
+Traceback (most recent call last):
+  File "D:\Projects\AURA-CX\backend\main.py", line 111, in websocket_endpoint
+    data = await websocket.receive_text()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\websockets.py", line 119, in receive_text
+    self._raise_on_disconnect(message)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\websockets.py", line 113, in _raise_on_disconnect
+    raise WebSocketDisconnect(message["code"], message.get("reason"))
+starlette.websockets.WebSocketDisconnect: (<CloseCode.ABNORMAL_CLOSURE: 1006>, None)
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\uvicorn\protocols\websockets\websockets_impl.py", line 244, in run_asgi
+    result = await self.app(self.scope, self.asgi_receive, self.asgi_send)  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\uvicorn\middleware\proxy_headers.py", line 70, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\fastapi\applications.py", line 1054, in __call__
+    await super().__call__(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\applications.py", line 113, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\middleware\errors.py", line 152, in __call__
+    await self.app(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\middleware\cors.py", line 77, in __call__
+    await self.app(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\middleware\exceptions.py", line 62, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\_exception_handler.py", line 62, in wrapped_app
+    raise exc
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\_exception_handler.py", line 51, in wrapped_app
+    await app(scope, receive, sender)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 715, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 735, in app
+    await route.handle(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 362, in handle
+    await self.app(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 95, in app
+    await wrap_app_handling_exceptions(app, session)(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\_exception_handler.py", line 62, in wrapped_app
+    raise exc
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\_exception_handler.py", line 51, in wrapped_app
+    await app(scope, receive, sender)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 93, in app
+    await func(session)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\fastapi\routing.py", line 383, in app
+    await dependant.call(**solved_result.values)
+  File "D:\Projects\AURA-CX\backend\main.py", line 115, in websocket_endpoint
+    manager.disconnect(websocket)
+    ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\backend\main.py", line 29, in disconnect
+    self.active_connections.remove(websocket)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+ValueError: list.remove(x): x not in list
+INFO:     connection closed
+INFO:     connection closed
+INFO:     connection closed
+INFO:     connection closed
+INFO:     ('127.0.0.1', 56040) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     ('127.0.0.1', 65129) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     ('127.0.0.1', 49883) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     ('127.0.0.1', 63745) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     ('127.0.0.1', 52373) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     ('127.0.0.1', 53849) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     ('127.0.0.1', 50452) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     ('127.0.0.1', 55724) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     connection closed
+INFO:     connection closed
+INFO:     connection closed
+INFO:     connection closed
+INFO:     connection closed
+INFO:     connection closed
+ERROR:    Exception in ASGI application
+Traceback (most recent call last):
+  File "D:\Projects\AURA-CX\backend\main.py", line 111, in websocket_endpoint
+    data = await websocket.receive_text()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\websockets.py", line 119, in receive_text
+    self._raise_on_disconnect(message)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\websockets.py", line 113, in _raise_on_disconnect
+    raise WebSocketDisconnect(message["code"], message.get("reason"))
+starlette.websockets.WebSocketDisconnect: (<CloseCode.ABNORMAL_CLOSURE: 1006>, None)
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\uvicorn\protocols\websockets\websockets_impl.py", line 244, in run_asgi
+    result = await self.app(self.scope, self.asgi_receive, self.asgi_send)  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\uvicorn\middleware\proxy_headers.py", line 70, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\fastapi\applications.py", line 1054, in __call__
+    await super().__call__(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\applications.py", line 113, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\middleware\errors.py", line 152, in __call__
+    await self.app(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\middleware\cors.py", line 77, in __call__
+    await self.app(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\middleware\exceptions.py", line 62, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\_exception_handler.py", line 62, in wrapped_app
+    raise exc
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\_exception_handler.py", line 51, in wrapped_app
+    await app(scope, receive, sender)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 715, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 735, in app
+    await route.handle(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 362, in handle
+    await self.app(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 95, in app
+    await wrap_app_handling_exceptions(app, session)(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\_exception_handler.py", line 62, in wrapped_app
+    raise exc
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\_exception_handler.py", line 51, in wrapped_app
+    await app(scope, receive, sender)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 93, in app
+    await func(session)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\fastapi\routing.py", line 383, in app
+    await dependant.call(**solved_result.values)
+  File "D:\Projects\AURA-CX\backend\main.py", line 115, in websocket_endpoint
+    manager.disconnect(websocket)
+    ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\backend\main.py", line 29, in disconnect
+    self.active_connections.remove(websocket)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+ValueError: list.remove(x): x not in list
+INFO:     connection closed
+INFO:     ('127.0.0.1', 50475) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     ('127.0.0.1', 61412) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     ('127.0.0.1', 54911) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     ('127.0.0.1', 52372) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     ('127.0.0.1', 61270) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     ('127.0.0.1', 65305) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     ('127.0.0.1', 52651) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     ('127.0.0.1', 62901) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+ERROR:    Exception in ASGI application
+Traceback (most recent call last):
+  File "D:\Projects\AURA-CX\backend\main.py", line 111, in websocket_endpoint
+    data = await websocket.receive_text()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\websockets.py", line 119, in receive_text
+    self._raise_on_disconnect(message)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\websockets.py", line 113, in _raise_on_disconnect
+    raise WebSocketDisconnect(message["code"], message.get("reason"))
+starlette.websockets.WebSocketDisconnect: (<CloseCode.ABNORMAL_CLOSURE: 1006>, None)
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\uvicorn\protocols\websockets\websockets_impl.py", line 244, in run_asgi
+    result = await self.app(self.scope, self.asgi_receive, self.asgi_send)  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\uvicorn\middleware\proxy_headers.py", line 70, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\fastapi\applications.py", line 1054, in __call__
+    await super().__call__(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\applications.py", line 113, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\middleware\errors.py", line 152, in __call__
+    await self.app(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\middleware\cors.py", line 77, in __call__
+    await self.app(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\middleware\exceptions.py", line 62, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\_exception_handler.py", line 62, in wrapped_app
+    raise exc
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\_exception_handler.py", line 51, in wrapped_app
+    await app(scope, receive, sender)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 715, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 735, in app
+    await route.handle(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 362, in handle
+    await self.app(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 95, in app
+    await wrap_app_handling_exceptions(app, session)(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\_exception_handler.py", line 62, in wrapped_app
+    raise exc
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\_exception_handler.py", line 51, in wrapped_app
+    await app(scope, receive, sender)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 93, in app
+    await func(session)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\fastapi\routing.py", line 383, in app
+    await dependant.call(**solved_result.values)
+  File "D:\Projects\AURA-CX\backend\main.py", line 115, in websocket_endpoint
+    manager.disconnect(websocket)
+    ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\backend\main.py", line 29, in disconnect
+    self.active_connections.remove(websocket)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+ValueError: list.remove(x): x not in list
+INFO:     connection closed
+ERROR:    Exception in ASGI application
+Traceback (most recent call last):
+  File "D:\Projects\AURA-CX\backend\main.py", line 111, in websocket_endpoint
+    data = await websocket.receive_text()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\websockets.py", line 119, in receive_text
+    self._raise_on_disconnect(message)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\websockets.py", line 113, in _raise_on_disconnect
+    raise WebSocketDisconnect(message["code"], message.get("reason"))
+starlette.websockets.WebSocketDisconnect: (<CloseCode.ABNORMAL_CLOSURE: 1006>, None)
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\uvicorn\protocols\websockets\websockets_impl.py", line 244, in run_asgi
+    result = await self.app(self.scope, self.asgi_receive, self.asgi_send)  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\uvicorn\middleware\proxy_headers.py", line 70, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\fastapi\applications.py", line 1054, in __call__
+    await super().__call__(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\applications.py", line 113, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\middleware\errors.py", line 152, in __call__
+    await self.app(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\middleware\cors.py", line 77, in __call__
+    await self.app(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\middleware\exceptions.py", line 62, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\_exception_handler.py", line 62, in wrapped_app
+    raise exc
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\_exception_handler.py", line 51, in wrapped_app
+    await app(scope, receive, sender)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 715, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 735, in app
+    await route.handle(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 362, in handle
+    await self.app(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 95, in app
+    await wrap_app_handling_exceptions(app, session)(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\_exception_handler.py", line 62, in wrapped_app
+    raise exc
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\_exception_handler.py", line 51, in wrapped_app
+    await app(scope, receive, sender)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 93, in app
+    await func(session)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\fastapi\routing.py", line 383, in app
+    await dependant.call(**solved_result.values)
+  File "D:\Projects\AURA-CX\backend\main.py", line 115, in websocket_endpoint
+    manager.disconnect(websocket)
+    ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\backend\main.py", line 29, in disconnect
+    self.active_connections.remove(websocket)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+ValueError: list.remove(x): x not in list
+INFO:     connection closed
+ERROR:    Exception in ASGI application
+Traceback (most recent call last):
+  File "D:\Projects\AURA-CX\backend\main.py", line 111, in websocket_endpoint
+    data = await websocket.receive_text()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\websockets.py", line 119, in receive_text
+    self._raise_on_disconnect(message)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\websockets.py", line 113, in _raise_on_disconnect
+    raise WebSocketDisconnect(message["code"], message.get("reason"))
+starlette.websockets.WebSocketDisconnect: (<CloseCode.ABNORMAL_CLOSURE: 1006>, None)
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\uvicorn\protocols\websockets\websockets_impl.py", line 244, in run_asgi
+    result = await self.app(self.scope, self.asgi_receive, self.asgi_send)  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\uvicorn\middleware\proxy_headers.py", line 70, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\fastapi\applications.py", line 1054, in __call__
+    await super().__call__(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\applications.py", line 113, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\middleware\errors.py", line 152, in __call__
+    await self.app(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\middleware\cors.py", line 77, in __call__
+    await self.app(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\middleware\exceptions.py", line 62, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\_exception_handler.py", line 62, in wrapped_app
+    raise exc
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\_exception_handler.py", line 51, in wrapped_app
+    await app(scope, receive, sender)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 715, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 735, in app
+    await route.handle(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 362, in handle
+    await self.app(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 95, in app
+    await wrap_app_handling_exceptions(app, session)(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\_exception_handler.py", line 62, in wrapped_app
+    raise exc
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\_exception_handler.py", line 51, in wrapped_app
+    await app(scope, receive, sender)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 93, in app
+    await func(session)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\fastapi\routing.py", line 383, in app
+    await dependant.call(**solved_result.values)
+  File "D:\Projects\AURA-CX\backend\main.py", line 115, in websocket_endpoint
+    manager.disconnect(websocket)
+    ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\backend\main.py", line 29, in disconnect
+    self.active_connections.remove(websocket)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+ValueError: list.remove(x): x not in list
+INFO:     connection closed
+ERROR:    Exception in ASGI application
+Traceback (most recent call last):
+  File "D:\Projects\AURA-CX\backend\main.py", line 111, in websocket_endpoint
+    data = await websocket.receive_text()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\websockets.py", line 119, in receive_text
+    self._raise_on_disconnect(message)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\websockets.py", line 113, in _raise_on_disconnect
+    raise WebSocketDisconnect(message["code"], message.get("reason"))
+starlette.websockets.WebSocketDisconnect: (<CloseCode.ABNORMAL_CLOSURE: 1006>, None)
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\uvicorn\protocols\websockets\websockets_impl.py", line 244, in run_asgi
+    result = await self.app(self.scope, self.asgi_receive, self.asgi_send)  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\uvicorn\middleware\proxy_headers.py", line 70, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\fastapi\applications.py", line 1054, in __call__
+    await super().__call__(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\applications.py", line 113, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\middleware\errors.py", line 152, in __call__
+    await self.app(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\middleware\cors.py", line 77, in __call__
+    await self.app(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\middleware\exceptions.py", line 62, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\_exception_handler.py", line 62, in wrapped_app
+    raise exc
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\_exception_handler.py", line 51, in wrapped_app
+    await app(scope, receive, sender)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 715, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 735, in app
+    await route.handle(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 362, in handle
+    await self.app(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 95, in app
+    await wrap_app_handling_exceptions(app, session)(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\_exception_handler.py", line 62, in wrapped_app
+    raise exc
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\_exception_handler.py", line 51, in wrapped_app
+    await app(scope, receive, sender)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 93, in app
+    await func(session)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\fastapi\routing.py", line 383, in app
+    await dependant.call(**solved_result.values)
+  File "D:\Projects\AURA-CX\backend\main.py", line 115, in websocket_endpoint
+    manager.disconnect(websocket)
+    ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\backend\main.py", line 29, in disconnect
+    self.active_connections.remove(websocket)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+ValueError: list.remove(x): x not in list
+INFO:     connection closed
+ERROR:    Exception in ASGI application
+Traceback (most recent call last):
+  File "D:\Projects\AURA-CX\backend\main.py", line 111, in websocket_endpoint
+    data = await websocket.receive_text()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\websockets.py", line 119, in receive_text
+    self._raise_on_disconnect(message)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\websockets.py", line 113, in _raise_on_disconnect
+    raise WebSocketDisconnect(message["code"], message.get("reason"))
+starlette.websockets.WebSocketDisconnect: (<CloseCode.ABNORMAL_CLOSURE: 1006>, None)
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\uvicorn\protocols\websockets\websockets_impl.py", line 244, in run_asgi
+    result = await self.app(self.scope, self.asgi_receive, self.asgi_send)  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\uvicorn\middleware\proxy_headers.py", line 70, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\fastapi\applications.py", line 1054, in __call__
+    await super().__call__(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\applications.py", line 113, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\middleware\errors.py", line 152, in __call__
+    await self.app(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\middleware\cors.py", line 77, in __call__
+    await self.app(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\middleware\exceptions.py", line 62, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\_exception_handler.py", line 62, in wrapped_app
+    raise exc
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\_exception_handler.py", line 51, in wrapped_app
+    await app(scope, receive, sender)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 715, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 735, in app
+    await route.handle(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 362, in handle
+    await self.app(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 95, in app
+    await wrap_app_handling_exceptions(app, session)(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\_exception_handler.py", line 62, in wrapped_app
+    raise exc
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\_exception_handler.py", line 51, in wrapped_app
+    await app(scope, receive, sender)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 93, in app
+    await func(session)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\fastapi\routing.py", line 383, in app
+    await dependant.call(**solved_result.values)
+  File "D:\Projects\AURA-CX\backend\main.py", line 115, in websocket_endpoint
+    manager.disconnect(websocket)
+    ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\backend\main.py", line 29, in disconnect
+    self.active_connections.remove(websocket)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+ValueError: list.remove(x): x not in list
+INFO:     connection closed
+ERROR:    Exception in ASGI application
+Traceback (most recent call last):
+  File "D:\Projects\AURA-CX\backend\main.py", line 111, in websocket_endpoint
+    data = await websocket.receive_text()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\websockets.py", line 119, in receive_text
+    self._raise_on_disconnect(message)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\websockets.py", line 113, in _raise_on_disconnect
+    raise WebSocketDisconnect(message["code"], message.get("reason"))
+starlette.websockets.WebSocketDisconnect: (<CloseCode.ABNORMAL_CLOSURE: 1006>, None)
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\uvicorn\protocols\websockets\websockets_impl.py", line 244, in run_asgi
+    result = await self.app(self.scope, self.asgi_receive, self.asgi_send)  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\uvicorn\middleware\proxy_headers.py", line 70, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\fastapi\applications.py", line 1054, in __call__
+    await super().__call__(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\applications.py", line 113, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\middleware\errors.py", line 152, in __call__
+    await self.app(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\middleware\cors.py", line 77, in __call__
+    await self.app(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\middleware\exceptions.py", line 62, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\_exception_handler.py", line 62, in wrapped_app
+    raise exc
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\_exception_handler.py", line 51, in wrapped_app
+    await app(scope, receive, sender)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 715, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 735, in app
+    await route.handle(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 362, in handle
+    await self.app(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 95, in app
+    await wrap_app_handling_exceptions(app, session)(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\_exception_handler.py", line 62, in wrapped_app
+    raise exc
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\_exception_handler.py", line 51, in wrapped_app
+    await app(scope, receive, sender)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 93, in app
+    await func(session)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\fastapi\routing.py", line 383, in app
+    await dependant.call(**solved_result.values)
+  File "D:\Projects\AURA-CX\backend\main.py", line 115, in websocket_endpoint
+    manager.disconnect(websocket)
+    ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\backend\main.py", line 29, in disconnect
+    self.active_connections.remove(websocket)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+ValueError: list.remove(x): x not in list
+INFO:     connection closed
+ERROR:    Exception in ASGI application
+Traceback (most recent call last):
+  File "D:\Projects\AURA-CX\backend\main.py", line 111, in websocket_endpoint
+    data = await websocket.receive_text()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\websockets.py", line 119, in receive_text
+    self._raise_on_disconnect(message)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\websockets.py", line 113, in _raise_on_disconnect
+    raise WebSocketDisconnect(message["code"], message.get("reason"))
+starlette.websockets.WebSocketDisconnect: (<CloseCode.ABNORMAL_CLOSURE: 1006>, None)
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\uvicorn\protocols\websockets\websockets_impl.py", line 244, in run_asgi
+    result = await self.app(self.scope, self.asgi_receive, self.asgi_send)  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\uvicorn\middleware\proxy_headers.py", line 70, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\fastapi\applications.py", line 1054, in __call__
+    await super().__call__(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\applications.py", line 113, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\middleware\errors.py", line 152, in __call__
+    await self.app(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\middleware\cors.py", line 77, in __call__
+    await self.app(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\middleware\exceptions.py", line 62, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\_exception_handler.py", line 62, in wrapped_app
+    raise exc
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\_exception_handler.py", line 51, in wrapped_app
+    await app(scope, receive, sender)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 715, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 735, in app
+    await route.handle(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 362, in handle
+    await self.app(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 95, in app
+    await wrap_app_handling_exceptions(app, session)(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\_exception_handler.py", line 62, in wrapped_app
+    raise exc
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\_exception_handler.py", line 51, in wrapped_app
+    await app(scope, receive, sender)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 93, in app
+    await func(session)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\fastapi\routing.py", line 383, in app
+    await dependant.call(**solved_result.values)
+  File "D:\Projects\AURA-CX\backend\main.py", line 115, in websocket_endpoint
+    manager.disconnect(websocket)
+    ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\backend\main.py", line 29, in disconnect
+    self.active_connections.remove(websocket)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+ValueError: list.remove(x): x not in list
+INFO:     connection closed
+ERROR:    Exception in ASGI application
+Traceback (most recent call last):
+  File "D:\Projects\AURA-CX\backend\main.py", line 111, in websocket_endpoint
+    data = await websocket.receive_text()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\websockets.py", line 119, in receive_text
+    self._raise_on_disconnect(message)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\websockets.py", line 113, in _raise_on_disconnect
+    raise WebSocketDisconnect(message["code"], message.get("reason"))
+starlette.websockets.WebSocketDisconnect: (<CloseCode.ABNORMAL_CLOSURE: 1006>, None)
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\uvicorn\protocols\websockets\websockets_impl.py", line 244, in run_asgi
+    result = await self.app(self.scope, self.asgi_receive, self.asgi_send)  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\uvicorn\middleware\proxy_headers.py", line 70, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\fastapi\applications.py", line 1054, in __call__
+    await super().__call__(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\applications.py", line 113, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\middleware\errors.py", line 152, in __call__
+    await self.app(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\middleware\cors.py", line 77, in __call__
+    await self.app(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\middleware\exceptions.py", line 62, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\_exception_handler.py", line 62, in wrapped_app
+    raise exc
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\_exception_handler.py", line 51, in wrapped_app
+    await app(scope, receive, sender)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 715, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 735, in app
+    await route.handle(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 362, in handle
+    await self.app(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 95, in app
+    await wrap_app_handling_exceptions(app, session)(scope, receive, send)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\_exception_handler.py", line 62, in wrapped_app
+    raise exc
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\_exception_handler.py", line 51, in wrapped_app
+    await app(scope, receive, sender)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\starlette\routing.py", line 93, in app
+    await func(session)
+  File "D:\Projects\AURA-CX\.venv\Lib\site-packages\fastapi\routing.py", line 383, in app
+    await dependant.call(**solved_result.values)
+  File "D:\Projects\AURA-CX\backend\main.py", line 115, in websocket_endpoint
+    manager.disconnect(websocket)
+    ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+  File "D:\Projects\AURA-CX\backend\main.py", line 29, in disconnect
+    self.active_connections.remove(websocket)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+ValueError: list.remove(x): x not in list
+INFO:     connection closed
+INFO:     ('127.0.0.1', 50552) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     ('127.0.0.1', 58749) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     ('127.0.0.1', 55446) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     ('127.0.0.1', 58128) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     ('127.0.0.1', 56978) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     ('127.0.0.1', 61510) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     ('127.0.0.1', 57255) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open
+INFO:     ('127.0.0.1', 57536) - "WebSocket /ws/live-feed" [accepted]
+INFO:     connection open

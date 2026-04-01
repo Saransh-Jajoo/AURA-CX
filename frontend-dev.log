@@ -1,0 +1,95 @@
+
+> frontend@0.1.0 dev
+> next dev
+
+▲ Next.js 16.2.1 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://172.16.87.25:3000
+✓ Ready in 2.6s
+Creating turbopack project { dir: 'D:\\Projects\\AURA-CX\\frontend', testMode: true }
+
+ GET / 200 in 1508ms (next.js: 513ms, application-code: 995ms)
+✓ Compiled in 3.5s
+✓ Compiled in 2.7s
+ GET / 200 in 1509ms (next.js: 541ms, application-code: 968ms)
+ GET / 200 in 518ms (next.js: 48ms, application-code: 470ms)
+ GET / 200 in 589ms (next.js: 36ms, application-code: 553ms)
+ GET / 200 in 589ms (next.js: 115ms, application-code: 474ms)
+ GET / 200 in 592ms (next.js: 175ms, application-code: 417ms)
+ GET / 200 in 344ms (next.js: 19ms, application-code: 325ms)
+ GET / 200 in 268ms (next.js: 21ms, application-code: 248ms)
+ GET / 200 in 129ms (next.js: 30ms, application-code: 99ms)
+✓ Compiled in 4.1s
+✓ Compiled in 750ms
+✓ Compiled in 282ms
+✓ Compiled in 444ms
+✓ Compiled in 534ms
+✓ Compiled in 387ms
+✓ Compiled in 2.1s
+✓ Compiled in 5.1s
+ GET / 200 in 1417ms (next.js: 442ms, application-code: 976ms)
+✓ Compiled in 2.9s
+ GET / 200 in 1463ms (next.js: 227ms, application-code: 1236ms)
+ GET / 200 in 628ms (next.js: 25ms, application-code: 603ms)
+ GET / 200 in 631ms (next.js: 219ms, application-code: 412ms)
+ GET / 200 in 1047ms (next.js: 132ms, application-code: 914ms)
+ GET / 200 in 633ms (next.js: 412ms, application-code: 221ms)
+ GET / 200 in 1148ms (next.js: 50ms, application-code: 1098ms)
+○ Compiling /login ...
+ GET /login 200 in 3.5s (next.js: 3.4s, application-code: 57ms)
+✓ Compiled in 745ms
+ GET /login 200 in 2.1s (next.js: 382ms, application-code: 1710ms)
+✓ Compiled in 2.3s
+ GET / 200 in 1785ms (next.js: 573ms, application-code: 1211ms)
+ GET /login 200 in 133ms (next.js: 58ms, application-code: 75ms)
+○ Compiling /dashboard ...
+ GET /dashboard 200 in 17.9s (next.js: 16.8s, application-code: 1125ms)
+ GET /dashboard 200 in 838ms (next.js: 389ms, application-code: 448ms)
+ GET /dashboard 200 in 227ms (next.js: 65ms, application-code: 162ms)
+ GET /login 200 in 266ms (next.js: 17ms, application-code: 249ms)
+ GET /login 200 in 170ms (next.js: 9ms, application-code: 160ms)
+✓ Finished filesystem cache database compaction in 10.1s
+ GET /dashboard 200 in 400ms (next.js: 191ms, application-code: 209ms)
+○ Compiling /dashboard/profiles ...
+ GET /dashboard/profiles 200 in 7.6s (next.js: 6.8s, application-code: 771ms)
+ GET /dashboard/profiles 200 in 891ms (next.js: 18ms, application-code: 873ms)
+ GET /dashboard/profiles 200 in 915ms (next.js: 32ms, application-code: 883ms)
+ GET /dashboard/profiles 200 in 912ms (next.js: 168ms, application-code: 744ms)
+ GET /dashboard/profiles 200 in 911ms (next.js: 293ms, application-code: 618ms)
+ GET /dashboard/profiles 200 in 911ms (next.js: 381ms, application-code: 530ms)
+ GET /dashboard/profiles 200 in 645ms (next.js: 41ms, application-code: 604ms)
+ GET /dashboard/profiles 200 in 435ms (next.js: 29ms, application-code: 406ms)
+ GET /dashboard/profiles 200 in 271ms (next.js: 129ms, application-code: 143ms)
+ GET /dashboard/profiles 200 in 280ms (next.js: 28ms, application-code: 252ms)
+○ Compiling /dashboard/hitl ...
+ GET /dashboard/hitl 200 in 4.0s (next.js: 3.4s, application-code: 609ms)
+ GET /dashboard/hitl 200 in 3.2s (next.js: 2.8s, application-code: 404ms)
+ GET /dashboard/hitl 200 in 337ms (next.js: 19ms, application-code: 318ms)
+ GET /dashboard/hitl 200 in 344ms (next.js: 95ms, application-code: 249ms)
+ GET /dashboard/profiles 200 in 100ms (next.js: 14ms, application-code: 85ms)
+ GET /dashboard/hitl 200 in 59ms (next.js: 9ms, application-code: 50ms)
+ GET /dashboard/hitl 200 in 67ms (next.js: 9ms, application-code: 58ms)
+ GET /dashboard 200 in 52ms (next.js: 11ms, application-code: 42ms)
+ GET /dashboard/profiles 200 in 67ms (next.js: 8ms, application-code: 59ms)
+ GET /login 200 in 39ms (next.js: 5ms, application-code: 34ms)
+ GET /dashboard/executive 200 in 2.6s (next.js: 2.4s, application-code: 232ms)
+○ Compiling /dashboard/analytics ...
+ GET /dashboard/analytics 200 in 7.5s (next.js: 7.4s, application-code: 117ms)
+ GET /dashboard/analytics 200 in 138ms (next.js: 8ms, application-code: 129ms)
+ GET /dashboard/analytics 200 in 104ms (next.js: 20ms, application-code: 84ms)
+ GET /dashboard 200 in 131ms (next.js: 47ms, application-code: 84ms)
+ GET /dashboard/executive 200 in 109ms (next.js: 25ms, application-code: 84ms)
+ GET /dashboard 200 in 41ms (next.js: 6ms, application-code: 35ms)
+ GET /dashboard/analytics 200 in 71ms (next.js: 9ms, application-code: 62ms)
+ GET /dashboard/subscriptions 200 in 2.3s (next.js: 2.2s, application-code: 123ms)
+ GET /dashboard/subscriptions 200 in 177ms (next.js: 7ms, application-code: 169ms)
+ GET /dashboard/subscriptions 200 in 108ms (next.js: 12ms, application-code: 96ms)
+ GET /login 200 in 50ms (next.js: 11ms, application-code: 39ms)
+ GET /dashboard/admin 200 in 1456ms (next.js: 1378ms, application-code: 78ms)
+○ Compiling /dashboard/qa-review ...
+ GET /dashboard/qa-review 200 in 10.6s (next.js: 10.1s, application-code: 508ms)
+ GET /dashboard/profiles 200 in 85ms (next.js: 33ms, application-code: 52ms)
+ GET /dashboard/admin 200 in 89ms (next.js: 10ms, application-code: 80ms)
+ GET /dashboard/executive 200 in 52ms (next.js: 12ms, application-code: 40ms)
+ GET /dashboard/analytics 200 in 49ms (next.js: 10ms, application-code: 39ms)
+ GET /login 200 in 797ms (next.js: 294ms, application-code: 502ms)

@@ -1,0 +1,132 @@
+@import "tailwindcss";
+
+/* ═══════════════════════════════════
+   AURA-CX — Enterprise Design System
+   Light + Dark Theme via next-themes
+   ═══════════════════════════════════ */
+
+/* Light theme (default) */
+:root {
+  --bg-primary: #f8fafc;
+  --bg-secondary: #ffffff;
+  --bg-card: #ffffff;
+  --bg-card-hover: #f1f5f9;
+  --border-subtle: #e2e8f0;
+  --border-glow: #3b82f6;
+  --text-primary: #0f172a;
+  --text-secondary: #334155;
+  --text-muted: #94a3b8;
+  --accent-blue: #3b82f6;
+  --accent-cyan: #06b6d4;
+  --accent-purple: #8b5cf6;
+  --accent-emerald: #10b981;
+  --accent-amber: #f59e0b;
+  --accent-rose: #f43f5e;
+  --glass-bg: rgba(255, 255, 255, 0.8);
+  --glass-border: rgba(0, 0, 0, 0.06);
+}
+
+/* Dark theme */
+.dark {
+  --bg-primary: #0a0e1a;
+  --bg-secondary: #111827;
+  --bg-card: #1a1f35;
+  --bg-card-hover: #222845;
+  --border-subtle: #1e293b;
+  --border-glow: #3b82f6;
+  --text-primary: #f1f5f9;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --glass-bg: rgba(17, 24, 39, 0.7);
+  --glass-border: rgba(255, 255, 255, 0.08);
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  overflow-x: hidden;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #475569; }
+:root:not(.dark) ::-webkit-scrollbar-thumb { background: #cbd5e1; }
+:root:not(.dark) ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+/* Glass Card */
+.glass-card {
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+}
+
+/* Glow Effects */
+.glow-blue { box-shadow: 0 0 20px rgba(59, 130, 246, 0.15); }
+.glow-purple { box-shadow: 0 0 20px rgba(139, 92, 246, 0.15); }
+.glow-emerald { box-shadow: 0 0 20px rgba(16, 185, 129, 0.15); }
+.glow-rose { box-shadow: 0 0 20px rgba(244, 63, 94, 0.15); }
+
+/* Pulse Animations */
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 8px rgba(59, 130, 246, 0.3); }
+  50% { box-shadow: 0 0 20px rgba(59, 130, 246, 0.6); }
+}
+.pulse-glow { animation: pulse-glow 2s ease-in-out infinite; }
+
+@keyframes pulse-red {
+  0%, 100% { box-shadow: 0 0 8px rgba(244, 63, 94, 0.3); }
+  50% { box-shadow: 0 0 24px rgba(244, 63, 94, 0.7); }
+}
+.pulse-red { animation: pulse-red 1.5s ease-in-out infinite; }
+
+@keyframes pulse-green {
+  0%, 100% { box-shadow: 0 0 8px rgba(16, 185, 129, 0.3); }
+  50% { box-shadow: 0 0 24px rgba(16, 185, 129, 0.7); }
+}
+.pulse-green { animation: pulse-green 2s ease-in-out infinite; }
+
+/* Slide-in */
+@keyframes slide-in-right {
+  from { opacity: 0; transform: translateX(30px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+.slide-in { animation: slide-in-right 0.4s ease-out; }
+
+/* Live Dot */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+.live-dot {
+  width: 8px; height: 8px;
+  background: #10b981;
+  border-radius: 50%;
+  animation: blink 1.5s ease-in-out infinite;
+}
+
+/* Severity Badges */
+.badge-critical { background: rgba(244, 63, 94, 0.15); color: #f43f5e; border: 1px solid rgba(244, 63, 94, 0.3); }
+.badge-high { background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3); }
+.badge-medium { background: rgba(59, 130, 246, 0.15); color: #3b82f6; border: 1px solid rgba(59, 130, 246, 0.3); }
+.badge-low { background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3); }
+
+/* Channel Badges */
+.channel-x { background: rgba(59, 130, 246, 0.08); color: #3b82f6; }
+.channel-reddit { background: rgba(255, 69, 0, 0.08); color: #ff6b35; }
+.channel-gmail { background: rgba(234, 67, 53, 0.08); color: #ea4335; }
+
+.dark .channel-x { background: rgba(255,255,255,0.08); color: #e2e8f0; }
+.dark .channel-reddit { background: rgba(255, 69, 0, 0.12); color: #ff6b35; }
+.dark .channel-gmail { background: rgba(234, 67, 53, 0.12); color: #ea4335; }
+
+/* Responsive */
+@media (max-width: 1024px) {
+  .lg\:col-span-2 { grid-column: span 1 / span 1; }
+}
