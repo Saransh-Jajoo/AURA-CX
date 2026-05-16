@@ -15,6 +15,18 @@ services:
       timeout: 5s
       retries: 5
 
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   chroma:
     image: chromadb/chroma:latest
     ports:
@@ -27,6 +39,8 @@ services:
       context: ./backend
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
       chroma:
         condition: service_started
@@ -54,6 +68,14 @@ services:
       STRIPE_PRICE_STARTER: ${STRIPE_PRICE_STARTER:-}
       STRIPE_PRICE_PRO: ${STRIPE_PRICE_PRO:-}
       STRIPE_PRICE_ENTERPRISE: ${STRIPE_PRICE_ENTERPRISE:-}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-}
+      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-}
+      TWILIO_PHONE_NUMBER: ${TWILIO_PHONE_NUMBER:-}
+      SUPPORTED_LANGUAGES: ${SUPPORTED_LANGUAGES:-en,hi,mr,ta,bn,gu,te,kn,ml}
     ports:
       - "8000:8000"
 
@@ -72,4 +94,5 @@ services:
 
 volumes:
   postgres-data:
+  redis-data:
   chroma-data:

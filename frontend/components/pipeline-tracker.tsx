@@ -5,12 +5,13 @@ import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import {
   Download, ShieldCheck, Fingerprint, Brain, UserCheck, Route, Radar, RotateCcw,
+  Timer, Phone, Megaphone,
 } from "lucide-react";
 
 /* ═══════════════════════════════════════════════════════════
-   Pipeline Tracker — Horizontal 4-Stage Interactive Bar
+   Pipeline Tracker — Horizontal Interactive Stage Bar
    Lights up as a ticket moves through stages:
-   Ingestion & Triage → AI Cognition → HITL Gateway → Feedback Loop
+   Ingestion & Triage → AI Cognition → HITL Gateway → Feedback → Enterprise
    ═══════════════════════════════════════════════════════════ */
 
 export interface PipelineStage {
@@ -30,6 +31,9 @@ const STAGES: PipelineStage[] = [
   { id: "routing", label: "Action Routing", shortLabel: "Route", icon: Route, color: "var(--accent-amber)" },
   { id: "shadow", label: "Shadow Tickets", shortLabel: "Shadow", icon: Radar, color: "var(--accent-rose)" },
   { id: "feedback", label: "RLHF Loop", shortLabel: "RLHF", icon: RotateCcw, color: "var(--accent-emerald)" },
+  { id: "sla", label: "SLA Engine", shortLabel: "SLA", icon: Timer, color: "var(--accent-sky)" },
+  { id: "voice", label: "Voice Agent", shortLabel: "Voice", icon: Phone, color: "var(--accent-secondary)" },
+  { id: "campaign", label: "Campaign Engine", shortLabel: "Campaign", icon: Megaphone, color: "var(--accent-primary)" },
 ];
 
 interface PipelineTrackerProps {

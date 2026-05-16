@@ -12,6 +12,7 @@ import {
   LayoutDashboard, Users, CheckSquare, TrendingUp, AlertTriangle,
   ClipboardCheck, CreditCard, Link2, LogOut, Shield,
   BarChart3, ChevronLeft, ChevronRight,
+  Brain, UserCog, Phone, Settings, FileCheck,
 } from "lucide-react";
 
 interface NavItem {
@@ -19,7 +20,8 @@ interface NavItem {
   label: string;
   icon: React.ComponentType<{ className?: string }>;
   badge?: string;
-  badgeVariant?: "live" | "ai" | "count";
+  badgeVariant?: "live" | "ai" | "count" | "enterprise";
+  section?: string;
 }
 
 const ALL_NAV_ITEMS: NavItem[] = [
@@ -33,12 +35,19 @@ const ALL_NAV_ITEMS: NavItem[] = [
   { href: "/dashboard/analytics", label: "Analytics", icon: TrendingUp },
   { href: "/dashboard/integrations", label: "Integrations", icon: Link2 },
   { href: "/dashboard/subscriptions", label: "Subscription", icon: CreditCard },
+  // ── Enterprise ──
+  { href: "/dashboard/knowledge", label: "Knowledge Base", icon: Brain, section: "Enterprise", badge: "RAG", badgeVariant: "ai" },
+  { href: "/dashboard/team", label: "Team", icon: UserCog, section: "Enterprise" },
+  { href: "/dashboard/voice", label: "Voice Agent", icon: Phone, section: "Enterprise", badge: "AI", badgeVariant: "ai" },
+  { href: "/dashboard/settings", label: "Settings", icon: Settings, section: "Enterprise" },
+  { href: "/dashboard/compliance", label: "Compliance", icon: FileCheck, section: "Enterprise" },
 ];
 
 const BADGE_STYLES: Record<string, string> = {
   live: "bg-[var(--accent-emerald)]/15 text-[var(--accent-emerald)] border border-[var(--accent-emerald)]/25",
   ai: "bg-[var(--accent-secondary)]/15 text-[var(--accent-secondary)] border border-[var(--accent-secondary)]/25",
   count: "bg-[var(--accent-primary)]/15 text-[var(--accent-primary)]",
+  enterprise: "bg-[var(--accent-teal)]/15 text-[var(--accent-teal)] border border-[var(--accent-teal)]/25",
 };
 
 export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
@@ -94,50 +103,67 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
 
       {/* ── Navigation ──────────────────────────────────── */}
       <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-0.5">
-        {navItems.map((item) => {
+        {navItems.map((item, index) => {
           const active = pathname === item.href;
+          const prevItem = index > 0 ? navItems[index - 1] : null;
+          const showDivider = item.section && (!prevItem || prevItem.section !== item.section);
           return (
-            <Link key={item.href} href={item.href}>
-              <div
-                className={cn(
-                  "flex items-center gap-3 px-3 py-2.5 rounded-[var(--radius-md)] transition-all duration-200 relative group",
-                  active
-                    ? "bg-[var(--accent-primary)]/8 text-[var(--accent-primary)]"
-                    : "text-[var(--text-secondary)] hover:bg-[var(--bg-card-hover)] hover:text-[var(--text-primary)]"
-                )}
-              >
-                {/* Active indicator bar */}
-                {active && (
-                  <motion.div
-                    layoutId="nav-active-indicator"
-                    className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-[var(--accent-primary)]"
-                    transition={{ type: "spring", stiffness: 400, damping: 28 }}
-                  />
-                )}
-
-                <item.icon
-                  className={cn(
-                    "w-[18px] h-[18px] shrink-0 transition-colors",
-                    active && "text-[var(--accent-primary)]"
-                  )}
-                />
-
-                {!collapsed && (
-                  <span className="text-[13px] font-medium truncate">{item.label}</span>
-                )}
-
-                {!collapsed && item.badge && (
-                  <span
-                    className={cn(
-                      "ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded-md uppercase tracking-wider",
-                      BADGE_STYLES[item.badgeVariant || "count"]
+            <React.Fragment key={item.href}>
+              {showDivider && (
+                <div className="pt-3 pb-1 px-3">
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 h-px bg-[var(--border-subtle)]" />
+                    {!collapsed && (
+                      <span className="text-[9px] font-bold uppercase tracking-[0.15em] text-[var(--text-muted)]">
+                        {item.section}
+                      </span>
                     )}
-                  >
-                    {item.badge}
-                  </span>
-                )}
-              </div>
-            </Link>
+                    <div className="flex-1 h-px bg-[var(--border-subtle)]" />
+                  </div>
+                </div>
+              )}
+              <Link href={item.href}>
+                <div
+                  className={cn(
+                    "flex items-center gap-3 px-3 py-2.5 rounded-[var(--radius-md)] transition-all duration-200 relative group",
+                    active
+                      ? "bg-[var(--accent-primary)]/8 text-[var(--accent-primary)]"
+                      : "text-[var(--text-secondary)] hover:bg-[var(--bg-card-hover)] hover:text-[var(--text-primary)]"
+                  )}
+                >
+                  {/* Active indicator bar */}
+                  {active && (
+                    <motion.div
+                      layoutId="nav-active-indicator"
+                      className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-[var(--accent-primary)]"
+                      transition={{ type: "spring", stiffness: 400, damping: 28 }}
+                    />
+                  )}
+
+                  <item.icon
+                    className={cn(
+                      "w-[18px] h-[18px] shrink-0 transition-colors",
+                      active && "text-[var(--accent-primary)]"
+                    )}
+                  />
+
+                  {!collapsed && (
+                    <span className="text-[13px] font-medium truncate">{item.label}</span>
+                  )}
+
+                  {!collapsed && item.badge && (
+                    <span
+                      className={cn(
+                        "ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded-md uppercase tracking-wider",
+                        BADGE_STYLES[item.badgeVariant || "count"]
+                      )}
+                    >
+                      {item.badge}
+                    </span>
+                  )}
+                </div>
+              </Link>
+            </React.Fragment>
           );
         })}
       </nav>

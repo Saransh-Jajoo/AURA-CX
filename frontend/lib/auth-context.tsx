@@ -108,6 +108,11 @@ export const ROLE_ROUTES: Record<UserRole, string[]> = {
     "/dashboard/integrations",
     "/dashboard/subscriptions",
     "/dashboard/executive",
+    "/dashboard/knowledge",
+    "/dashboard/team",
+    "/dashboard/settings",
+    "/dashboard/voice",
+    "/dashboard/compliance",
   ],
   tenant_admin: [
     "/dashboard",
@@ -120,10 +125,15 @@ export const ROLE_ROUTES: Record<UserRole, string[]> = {
     "/dashboard/integrations",
     "/dashboard/subscriptions",
     "/dashboard/executive",
+    "/dashboard/knowledge",
+    "/dashboard/team",
+    "/dashboard/settings",
+    "/dashboard/voice",
+    "/dashboard/compliance",
   ],
-  executive: ["/dashboard", "/dashboard/executive", "/dashboard/analytics", "/dashboard/subscriptions", "/dashboard/profiles"],
-  qa_reviewer: ["/dashboard", "/dashboard/qa-review", "/dashboard/hitl", "/dashboard/analytics", "/dashboard/profiles"],
-  support_agent: ["/dashboard", "/dashboard/profiles", "/dashboard/hitl"],
+  executive: ["/dashboard", "/dashboard/executive", "/dashboard/analytics", "/dashboard/subscriptions", "/dashboard/profiles", "/dashboard/compliance"],
+  qa_reviewer: ["/dashboard", "/dashboard/qa-review", "/dashboard/hitl", "/dashboard/analytics", "/dashboard/profiles", "/dashboard/knowledge", "/dashboard/voice"],
+  support_agent: ["/dashboard", "/dashboard/profiles", "/dashboard/hitl", "/dashboard/knowledge", "/dashboard/voice"],
 };
 
 export const ROLE_DEFAULT_ROUTE: Record<UserRole, string> = {

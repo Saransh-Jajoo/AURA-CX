@@ -3,11 +3,11 @@ import { NextRequest, NextResponse } from "next/server";
 type UserRole = "super_admin" | "tenant_admin" | "executive" | "qa_reviewer" | "support_agent";
 
 const ROLE_ROUTES: Record<UserRole, string[]> = {
-  super_admin: ["/dashboard", "/dashboard/admin", "/dashboard/analytics", "/dashboard/profiles", "/dashboard/hitl", "/dashboard/shadow-tickets", "/dashboard/qa-review", "/dashboard/integrations", "/dashboard/subscriptions", "/dashboard/executive"],
-  tenant_admin: ["/dashboard", "/dashboard/admin", "/dashboard/analytics", "/dashboard/profiles", "/dashboard/hitl", "/dashboard/shadow-tickets", "/dashboard/qa-review", "/dashboard/integrations", "/dashboard/subscriptions", "/dashboard/executive"],
-  executive: ["/dashboard", "/dashboard/executive", "/dashboard/analytics", "/dashboard/subscriptions", "/dashboard/profiles"],
-  qa_reviewer: ["/dashboard", "/dashboard/qa-review", "/dashboard/hitl", "/dashboard/analytics", "/dashboard/profiles"],
-  support_agent: ["/dashboard", "/dashboard/profiles", "/dashboard/hitl"],
+  super_admin: ["/dashboard", "/dashboard/admin", "/dashboard/analytics", "/dashboard/profiles", "/dashboard/hitl", "/dashboard/shadow-tickets", "/dashboard/qa-review", "/dashboard/integrations", "/dashboard/subscriptions", "/dashboard/executive", "/dashboard/knowledge", "/dashboard/team", "/dashboard/settings", "/dashboard/voice", "/dashboard/compliance"],
+  tenant_admin: ["/dashboard", "/dashboard/admin", "/dashboard/analytics", "/dashboard/profiles", "/dashboard/hitl", "/dashboard/shadow-tickets", "/dashboard/qa-review", "/dashboard/integrations", "/dashboard/subscriptions", "/dashboard/executive", "/dashboard/knowledge", "/dashboard/team", "/dashboard/settings", "/dashboard/voice", "/dashboard/compliance"],
+  executive: ["/dashboard", "/dashboard/executive", "/dashboard/analytics", "/dashboard/subscriptions", "/dashboard/profiles", "/dashboard/compliance"],
+  qa_reviewer: ["/dashboard", "/dashboard/qa-review", "/dashboard/hitl", "/dashboard/analytics", "/dashboard/profiles", "/dashboard/knowledge", "/dashboard/voice"],
+  support_agent: ["/dashboard", "/dashboard/profiles", "/dashboard/hitl", "/dashboard/knowledge", "/dashboard/voice"],
 };
 
 const ROLE_DEFAULT_ROUTE: Record<UserRole, string> = {

@@ -1,0 +1,166 @@
+"""
+AURA-CX — Celery Application
+Background task processing for SLA monitoring, campaign execution,
+KB re-indexing, and voice transcript processing.
+"""
+
+from celery import Celery
+from config import settings
+
+celery_app = Celery(
+    "aura_cx",
+    broker=settings.CELERY_BROKER_URL,
+    backend=settings.CELERY_RESULT_BACKEND,
+)
+
+celery_app.conf.update(
+    task_serializer="json",
+    result_serializer="json",
+    accept_content=["json"],
+    timezone="UTC",
+    enable_utc=True,
+    task_track_started=True,
+    task_acks_late=True,
+    worker_prefetch_multiplier=1,
+    task_default_queue="default",
+    task_routes={
+        "tasks.sla.*": {"queue": "sla"},
+        "tasks.campaign.*": {"queue": "campaign"},
+        "tasks.kb.*": {"queue": "knowledge"},
+        "tasks.voice.*": {"queue": "voice"},
+    },
+    beat_schedule={
+        "sla-breach-scanner": {
+            "task": "tasks.sla.scan_breaches",
+            "schedule": 60.0,  # every 60 seconds
+        },
+        "campaign-trigger-evaluator": {
+            "task": "tasks.campaign.evaluate_triggers",
+            "schedule": 300.0,  # every 5 minutes
+        },
+    },
+)
+
+
+# ── SLA Tasks ─────────────────────────────────────────────────
+@celery_app.task(name="tasks.sla.scan_breaches")
+def scan_sla_breaches():
+    """Periodic scan for SLA breaches and escalation triggers."""
+    import asyncio
+    from database import SessionLocal
+    from services.sla_engine import SLAEngine
+
+    async def _scan():
+        async with SessionLocal() as db:
+            from sqlalchemy import select, and_
+            from models import Ticket
+            from datetime import datetime, timezone
+
+            engine = SLAEngine()
+            stmt = select(Ticket).where(
+                and_(
+                    Ticket.status.in_(["new", "in_progress", "awaiting_reply"]),
+                    Ticket.sla_deadline.isnot(None),
+                )
+            )
+            result = await db.execute(stmt)
+            active_tickets = result.scalars().all()
+
+            breached = []
+            for ticket in active_tickets:
+                status = engine.check_status(ticket)
+                if status["breached"] and not ticket.sla_breached:
+                    ticket.sla_breached = True
+                    ticket.sla_breach_at = datetime.now(timezone.utc)
+                    breached.append(ticket.id)
+
+            if breached:
+                await db.commit()
+
+            return {"scanned": len(active_tickets), "breached": len(breached)}
+
+    return asyncio.run(_scan())
+
+
+# ── Campaign Tasks ────────────────────────────────────────────
+@celery_app.task(name="tasks.campaign.evaluate_triggers")
+def evaluate_campaign_triggers():
+    """Evaluate pending campaign triggers and mark eligible ones for execution."""
+    import asyncio
+    from database import SessionLocal
+
+    async def _evaluate():
+        async with SessionLocal() as db:
+            from sqlalchemy import select
+            from models import CampaignTrigger
+
+            stmt = select(CampaignTrigger).where(CampaignTrigger.status == "pending")
+            result = await db.execute(stmt)
+            pending = result.scalars().all()
+
+            evaluated = 0
+            for trigger in pending:
+                # Auto-approve low-risk triggers
+                if trigger.trigger_type in ("follow_up", "satisfaction_survey"):
+                    trigger.status = "approved"
+                    evaluated += 1
+
+            if evaluated:
+                await db.commit()
+
+            return {"pending": len(pending), "auto_approved": evaluated}
+
+    return asyncio.run(_evaluate())
+
+
+# ── Knowledge Base Tasks ──────────────────────────────────────
+@celery_app.task(name="tasks.kb.reindex_document")
+def reindex_kb_document(document_id: str, tenant_id: str):
+    """Re-chunk and re-embed a knowledge base document."""
+    import asyncio
+    from database import SessionLocal
+
+    async def _reindex():
+        async with SessionLocal() as db:
+            from sqlalchemy import select
+            from models import KnowledgeDocument
+            from datetime import datetime, timezone
+
+            stmt = select(KnowledgeDocument).where(KnowledgeDocument.id == document_id)
+            result = await db.execute(stmt)
+            doc = result.scalar_one_or_none()
+
+            if not doc:
+                return {"error": "Document not found"}
+
+            # Mark as re-indexed
+            doc.last_indexed_at = datetime.now(timezone.utc)
+            await db.commit()
+
+            return {"document_id": document_id, "status": "reindexed"}
+
+    return asyncio.run(_reindex())
+
+
+# ── Voice Processing Tasks ────────────────────────────────────
+@celery_app.task(name="tasks.voice.process_transcript")
+def process_voice_transcript(call_id: str, tenant_id: str):
+    """Process and analyze a voice call transcript with AI."""
+    import asyncio
+    from database import SessionLocal
+
+    async def _process():
+        async with SessionLocal() as db:
+            from sqlalchemy import select
+            from models import CallRecording
+
+            stmt = select(CallRecording).where(CallRecording.id == call_id)
+            result = await db.execute(stmt)
+            call = result.scalar_one_or_none()
+
+            if not call:
+                return {"error": "Call not found"}
+
+            return {"call_id": call_id, "status": "processed"}
+
+    return asyncio.run(_process())

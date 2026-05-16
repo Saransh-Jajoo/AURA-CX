@@ -23,8 +23,9 @@ import {
   Clock, Zap, Activity, CheckCircle, Users, Shield,
   ArrowUpRight, ArrowDownRight, Wifi, WifiOff,
   Edit3, Send, RotateCcw, Sparkles,
-  MessageCircle, Bot,
+  MessageCircle, Bot, Timer, Phone, Brain, FileCheck,
 } from "lucide-react";
+import { fetchVoiceAnalytics, fetchKBGaps, fetchComplianceSummary } from "@/lib/api";
 
 /* ── Severity Styles ────────────────────────────────────── */
 const SEVERITY_CLASSES: Record<string, string> = {
@@ -183,6 +184,11 @@ export default function CommandCenterPage() {
   const [search, setSearch] = useState("");
   const wsRef = useRef<AuraWebSocket | null>(null);
 
+  // Enterprise pulse state
+  const [voiceCount, setVoiceCount] = useState<number | null>(null);
+  const [kbGapCount, setKbGapCount] = useState<number | null>(null);
+  const [auditCount, setAuditCount] = useState<number | null>(null);
+
   // Detail panel state
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
   const [detailProfile, setDetailProfile] = useState<GoldenProfile | null>(null);
@@ -196,6 +202,11 @@ export default function CommandCenterPage() {
       setTickets(d.tickets || []);
     }).catch(() => {});
     fetchKPIs().then(setKpis).catch(() => {});
+
+    // Enterprise data
+    fetchVoiceAnalytics().then(v => setVoiceCount(v.total_calls)).catch(() => {});
+    fetchKBGaps(false).then(g => setKbGapCount(g.unresolved_count)).catch(() => {});
+    fetchComplianceSummary().then(c => setAuditCount(c.total_events)).catch(() => {});
   }, [setKpis, setTickets]);
 
   useEffect(() => {
@@ -344,6 +355,38 @@ export default function CommandCenterPage() {
           <KPICard label="AI Confidence" value={`${(kpis.ai_confidence_avg * 100).toFixed(0)}%`} icon={Shield} color="var(--accent-secondary)" trend="up" />
         </div>
       )}
+
+      {/* ── Enterprise Pulse Strip ──────────────────────── */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="solid-card p-3 flex items-center gap-3 border-l-2 border-l-[var(--accent-sky)]">
+          <Timer className="w-4 h-4 text-[var(--accent-sky)]" />
+          <div>
+            <p className="text-[10px] text-[var(--text-muted)] font-semibold uppercase">SLA Engine</p>
+            <p className="text-sm font-bold text-[var(--accent-sky)]">Active</p>
+          </div>
+        </motion.div>
+        <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }} className="solid-card p-3 flex items-center gap-3 border-l-2 border-l-[var(--accent-secondary)]">
+          <Phone className="w-4 h-4 text-[var(--accent-secondary)]" />
+          <div>
+            <p className="text-[10px] text-[var(--text-muted)] font-semibold uppercase">Voice Calls</p>
+            <p className="text-sm font-bold text-[var(--accent-secondary)]">{voiceCount ?? "—"}</p>
+          </div>
+        </motion.div>
+        <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="solid-card p-3 flex items-center gap-3 border-l-2 border-l-[var(--accent-rose)]">
+          <Brain className="w-4 h-4 text-[var(--accent-rose)]" />
+          <div>
+            <p className="text-[10px] text-[var(--text-muted)] font-semibold uppercase">KB Gaps</p>
+            <p className="text-sm font-bold text-[var(--accent-rose)]">{kbGapCount ?? "—"}</p>
+          </div>
+        </motion.div>
+        <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }} className="solid-card p-3 flex items-center gap-3 border-l-2 border-l-[var(--accent-emerald)]">
+          <FileCheck className="w-4 h-4 text-[var(--accent-emerald)]" />
+          <div>
+            <p className="text-[10px] text-[var(--text-muted)] font-semibold uppercase">Audit Events</p>
+            <p className="text-sm font-bold text-[var(--accent-emerald)]">{auditCount ?? "—"}</p>
+          </div>
+        </motion.div>
+      </div>
 
       {/* ── Kanban Board ────────────────────────────────── */}
       {tickets.length === 0 ? (

@@ -16,3 +16,7 @@ numpy>=1.26
 hdbscan>=0.8.33
 pinecone>=5.0
 chromadb>=0.5
+# Enterprise extensions
+cryptography>=42.0
+celery[redis]>=5.3
+redis>=5.0

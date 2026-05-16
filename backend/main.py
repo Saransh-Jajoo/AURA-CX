@@ -13,7 +13,10 @@ from config import settings
 from database import SessionLocal, init_db
 from models import Ticket, User
 from routers import ai as ai_router
-from routers import analytics, auth, ingestion, integrations, profiles, subscriptions, tenants, tickets
+from routers import (
+    analytics, auth, compliance, ingestion, integrations, knowledge,
+    profiles, settings as settings_router, subscriptions, team, tenants, tickets, voice,
+)
 from security import decode_token
 from services.realtime import manager, ticket_to_dict
 
@@ -52,6 +55,11 @@ app.include_router(profiles.router, prefix="/api/v1", tags=["Profiles"])
 app.include_router(analytics.router, prefix="/api/v1", tags=["Analytics"])
 app.include_router(subscriptions.router, prefix="/api/v1", tags=["Subscriptions"])
 app.include_router(ai_router.router, prefix="/api/v1", tags=["AI"])
+app.include_router(team.router, prefix="/api/v1", tags=["Team"])
+app.include_router(knowledge.router, prefix="/api/v1", tags=["Knowledge"])
+app.include_router(settings_router.router, prefix="/api/v1", tags=["Settings"])
+app.include_router(voice.router, prefix="/api/v1", tags=["Voice"])
+app.include_router(compliance.router, prefix="/api/v1", tags=["Compliance"])
 
 
 @app.get("/health")
@@ -71,12 +79,21 @@ async def health_check():
             "routing_handoff": "active",
             "shadow_ticket_clustering": "active",
             "rlhf_feedback": "active",
+            "sla_engine": "active",
+            "voice_agent": "active" if settings.TWILIO_ACCOUNT_SID else "needs_configuration",
+            "kb_management": "active",
+            "compliance_audit": "active",
+            "campaign_engine": "active",
+            "multilingual": "active",
         },
         "providers": {
             "gemini": bool(settings.GEMINI_API_KEY),
             "vector_provider": settings.VECTOR_PROVIDER,
             "pinecone": bool(settings.PINECONE_API_KEY and settings.PINECONE_HOST),
             "stripe": bool(settings.STRIPE_SECRET_KEY),
+            "redis": bool(settings.REDIS_URL),
+            "twilio": bool(settings.TWILIO_ACCOUNT_SID),
+            "encryption": bool(settings.ENCRYPTION_KEY or settings.SECRET_KEY),
         },
     }
 
