@@ -1,21 +1,57 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
-import { CheckCircle, XCircle, Edit3, Send, AlertTriangle, BookOpen, Zap } from "lucide-react";
+import {
+  fetchHITLQueue, approveTicket, escalateTicket,
+  editTicketWithRLHF, sendRLHFSignal, fetchProfile,
+  generateAIDraft, createHandoffLink,
+} from "@/lib/api";
+import type { HITLItem, GoldenProfile } from "@/lib/types";
+import { GoldenProfileStitching } from "@/components/golden-profile-stitching";
+import { SentimentGauge } from "@/components/sentiment-gauge";
+import {
+  CheckCircle, XCircle, Edit3, Send, AlertTriangle, BookOpen,
+  Zap, ChevronRight, Sparkles, RotateCcw, MoreHorizontal, Copy, Trash2,
+  MessageCircle, Bot, Loader2,
+} from "lucide-react";
+import { ChannelBadge } from "@/components/channel-icons";
 
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-const CHANNEL_ICONS: Record<string, string> = { x: "𝕏", reddit: "🔴", gmail: "📧" };
+/* ── Confidence Ring ──────────────────────────────────────── */
+function ConfidenceRing({ value, size = 40 }: { value: number; size?: number }) {
+  const r = size / 2 - 3;
+  const c = 2 * Math.PI * r;
+  const color = value > 0.85 ? "var(--accent-emerald)" : value > 0.7 ? "var(--accent-amber)" : "var(--accent-rose)";
+  return (
+    <div className="relative inline-flex items-center justify-center" style={{ width: size, height: size }}>
+      <svg width={size} height={size} className="-rotate-90">
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--border-subtle)" strokeWidth={2.5} />
+        <motion.circle
+          cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth={2.5}
+          strokeDasharray={c} strokeLinecap="round"
+          initial={{ strokeDashoffset: c }}
+          animate={{ strokeDashoffset: c - value * c }}
+          transition={{ duration: 1, ease: "easeOut" }}
+        />
+      </svg>
+      <span className="absolute text-[10px] font-bold font-mono" style={{ color }}>
+        {value.toFixed(2)}
+      </span>
+    </div>
+  );
+}
 
 export default function HITLPage() {
-  const [queue, setQueue] = useState<any[]>([]);
-  const [selected, setSelected] = useState<number>(0);
+  const [queue, setQueue] = useState<HITLItem[]>([]);
+  const [selected, setSelected] = useState(0);
   const [editDraft, setEditDraft] = useState("");
   const [editing, setEditing] = useState(false);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [profile, setProfile] = useState<GoldenProfile | null>(null);
 
   useEffect(() => {
-    fetch(`${API}/api/v1/tickets/hitl`).then((r) => r.json()).then((d) => {
+    fetchHITLQueue().then((d) => {
       setQueue(d.queue || []);
       if (d.queue?.length) setEditDraft(d.queue[0].ai_draft);
     });
@@ -23,24 +59,82 @@ export default function HITLPage() {
 
   const item = queue[selected];
 
+  // Load profile when item changes
+  useEffect(() => {
+    if (!item) return;
+    setProfile(null);
+    fetchProfile(item.id).then(setProfile).catch(() => setProfile(null));
+    if (!item.ai_draft) {
+      generateAIDraft({
+        channel: item.channel,
+        customer_name: item.customer_name,
+        message: item.message,
+        product: item.product,
+      })
+        .then((draft) => setEditDraft(draft.draft))
+        .catch(() => setEditDraft(""));
+    }
+  }, [item]);
+
   const handleAction = async (action: "approve" | "edit" | "escalate") => {
     if (!item) return;
-    const endpoint = action === "edit" ? "edit" : action;
-    await fetch(`${API}/api/v1/tickets/${item.id}/${endpoint}`, { method: "POST" });
-    setQueue((prev) => prev.filter((_, i) => i !== selected));
-    setSelected(0);
-    setEditing(false);
+    setActionLoading(action);
+
+    try {
+      if (action === "approve") {
+        await approveTicket(item.id);
+        await sendRLHFSignal({
+          ticket_id: item.id,
+          signal_type: "positive",
+          original_draft: editDraft || item.ai_draft,
+        });
+      } else if (action === "edit") {
+        await editTicketWithRLHF(item.id, {
+          ticket_id: item.id,
+          signal_type: "corrective",
+          original_draft: item.ai_draft || editDraft,
+          edited_draft: editDraft,
+        });
+      } else {
+        await escalateTicket(item.id);
+        await sendRLHFSignal({
+          ticket_id: item.id,
+          signal_type: "escalated",
+          original_draft: editDraft || item.ai_draft,
+        });
+      }
+
+      setQueue((prev) => prev.filter((_, i) => i !== selected));
+      setSelected(0);
+      setEditing(false);
+      if (queue.length > 1) {
+        const nextItem = queue.filter((_, i) => i !== selected)[0];
+        if (nextItem) setEditDraft(nextItem.ai_draft);
+      }
+    } finally {
+      setActionLoading(null);
+    }
   };
 
+  // Empty state
   if (!queue.length) {
     return (
       <div className="space-y-6">
-        <h1 className="text-2xl font-bold">HITL Verification Queue</h1>
-        <div className="glass-card p-12 text-center">
-          <CheckCircle className="w-12 h-12 text-emerald-400 mx-auto mb-4" />
-          <p className="text-lg font-semibold">Queue Clear</p>
-          <p className="text-sm text-[var(--text-muted)]">All AI drafts have been reviewed.</p>
+        <div>
+          <h1 className="text-2xl font-bold font-display">HITL Verification Queue</h1>
+          <p className="text-sm text-[var(--text-muted)]">All AI drafts reviewed. Queue clear.</p>
         </div>
+        <motion.div
+          initial={{ opacity: 0, scale: 0.97 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="glass-card p-16 text-center"
+        >
+          <div className="w-16 h-16 rounded-full bg-[var(--accent-emerald)]/10 flex items-center justify-center mx-auto mb-4">
+            <CheckCircle className="w-8 h-8 text-[var(--accent-emerald)]" />
+          </div>
+          <p className="text-lg font-semibold font-display">Queue Clear</p>
+          <p className="text-sm text-[var(--text-muted)] mt-1">All AI-generated drafts have been verified.</p>
+        </motion.div>
       </div>
     );
   }
@@ -48,124 +142,236 @@ export default function HITLPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">HITL Verification Queue</h1>
-        <p className="text-sm text-[var(--text-muted)]">Review AI-generated drafts before dispatch. Edits feed the RLHF training loop.</p>
+        <h1 className="text-2xl font-bold font-display">HITL Verification Queue</h1>
+        <p className="text-sm text-[var(--text-muted)]">
+          Review AI-generated drafts before dispatch. Edits feed the RLHF training loop.
+        </p>
       </div>
 
       <div className="grid grid-cols-12 gap-5">
-        {/* Queue List */}
+        {/* ── Queue List ─────────────────────────────────── */}
         <div className="col-span-4 glass-card overflow-hidden">
           <div className="px-4 py-3 border-b border-[var(--border-subtle)] flex items-center justify-between">
-            <h3 className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">Pending Review</h3>
-            <span className="text-xs font-bold text-blue-400">{queue.length}</span>
+            <h3 className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">
+              Pending Review
+            </h3>
+            <span className="text-xs font-bold text-[var(--accent-primary)] font-mono">{queue.length}</span>
           </div>
           <div className="divide-y divide-[var(--border-subtle)] max-h-[700px] overflow-y-auto">
             {queue.map((q, i) => (
-              <button key={q.id} onClick={() => { setSelected(i); setEditDraft(q.ai_draft); setEditing(false); }}
-                className={cn("w-full px-4 py-3 text-left hover:bg-[var(--bg-card-hover)] transition-colors",
-                  selected === i && "bg-blue-500/10 border-l-2 border-blue-500")}>
+              <button
+                key={q.id}
+                onClick={() => { setSelected(i); setEditDraft(q.ai_draft); setEditing(false); }}
+                className={cn(
+                  "w-full px-4 py-3.5 text-left hover:bg-[var(--bg-card-hover)] transition-all relative",
+                  selected === i && "bg-[var(--accent-primary)]/5"
+                )}
+              >
+                {selected === i && (
+                  <motion.div
+                    layoutId="hitl-active"
+                    className="absolute left-0 top-0 bottom-0 w-[3px] bg-[var(--accent-primary)] rounded-r-full"
+                    transition={{ type: "spring", stiffness: 400, damping: 28 }}
+                  />
+                )}
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="text-xs">{CHANNEL_ICONS[q.channel]}</span>
+                  <ChannelBadge channel={q.channel} />
                   <span className="text-sm font-medium truncate">{q.customer_name}</span>
-                  {q.auto_approvable && <span title="Auto-approvable (&gt;85%)"><Zap className="w-3 h-3 text-emerald-400 ml-auto" /></span>}
+                  {q.auto_approvable && (
+                    <span title="Auto-approvable (>85%)">
+                      <Sparkles className="w-3 h-3 text-[var(--accent-emerald)] ml-auto" />
+                    </span>
+                  )}
                 </div>
                 <p className="text-[11px] text-[var(--text-muted)] truncate">{q.message}</p>
                 <div className="flex items-center gap-2 mt-1.5">
-                  <span className={cn("px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase", `badge-${q.severity}`)}>{q.severity}</span>
-                  <span className="text-[10px] text-[var(--text-muted)]">{(q.confidence * 100).toFixed(0)}%</span>
-                  {q.requires_senior_review && <AlertTriangle className="w-3 h-3 text-amber-400 ml-auto" />}
+                  <span className={cn("px-1.5 py-0.5 rounded-full text-[9px] font-semibold uppercase", `badge-${q.severity}`)}>
+                    {q.severity}
+                  </span>
+                  <span className="text-[10px] text-[var(--text-muted)] font-mono">
+                    {(q.confidence * 100).toFixed(0)}%
+                  </span>
+                  {q.requires_senior_review && (
+                    <AlertTriangle className="w-3 h-3 text-[var(--accent-amber)] ml-auto" />
+                  )}
                 </div>
               </button>
             ))}
           </div>
         </div>
 
-        {/* Review Panel */}
+        {/* ── Review Panel ───────────────────────────────── */}
         <div className="col-span-8 space-y-5">
-          {item && (
-            <>
-              {/* Customer Message */}
-              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="glass-card p-5">
-                <div className="flex items-center gap-3 mb-3">
-                  <span className={cn("px-2.5 py-1 rounded-lg text-xs font-medium", `channel-${item.channel}`)}>
-                    {CHANNEL_ICONS[item.channel]} {item.channel}
-                  </span>
-                  <span className="font-semibold text-sm">{item.customer_name}</span>
-                  <span className={cn("px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase", `badge-${item.severity}`)}>{item.severity}</span>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] bg-purple-500/10 text-purple-400">{item.product}</span>
-                </div>
-                <p className="text-sm text-[var(--text-secondary)] leading-relaxed">{item.message}</p>
-              </motion.div>
-
-              {/* AI Draft */}
-              <div className={cn("glass-card p-5", item.auto_approvable ? "glow-emerald" : item.requires_senior_review ? "glow-rose" : "glow-blue")}>
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <Zap className="w-4 h-4 text-blue-400" />
-                    <h3 className="text-sm font-semibold">AI Draft Response</h3>
-                    <span className={cn("px-2 py-0.5 rounded-full text-[10px] font-bold",
-                      item.confidence > 0.85 ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30" :
-                      item.confidence > 0.7 ? "bg-amber-500/15 text-amber-400 border border-amber-500/30" :
-                      "bg-red-500/15 text-red-400 border border-red-500/30"
-                    )}>
-                      {(item.confidence * 100).toFixed(0)}% confidence
-                    </span>
-                    {item.auto_approvable && (
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-                        ✓ Auto-Draft Available
-                      </span>
-                    )}
+          <AnimatePresence mode="wait">
+            {item && (
+              <motion.div
+                key={item.id}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.25 }}
+                className="space-y-5"
+              >
+                {/* ── Identity & Analytics + Sentiment Velocity ── */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                  {/* Golden Profile Stitching */}
+                  <div className="glass-card p-5">
+                    <h3 className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-4">
+                      Identity & Analytics
+                    </h3>
+                    {profile ? <GoldenProfileStitching profile={profile} /> : <p className="text-sm text-[var(--text-muted)]">No verified identity match yet.</p>}
                   </div>
-                  <button onClick={() => setEditing(!editing)}
-                    className="flex items-center gap-1.5 text-xs text-[var(--text-muted)] hover:text-blue-400 transition-colors">
-                    <Edit3 className="w-3.5 h-3.5" /> {editing ? "Cancel Edit" : "Edit Draft"}
-                  </button>
+
+                  {/* Sentiment Velocity Gauge */}
+                  <div className="glass-card p-5">
+                    <h3 className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-3">
+                      Sentiment Velocity (V_sent)
+                    </h3>
+                    <SentimentGauge
+                      value={profile ? Math.round(profile.churn_risk * 100) : 50}
+                      highRisk={profile?.churn_alert}
+                      size={240}
+                    />
+                  </div>
                 </div>
 
-                {editing ? (
-                  <textarea
-                    value={editDraft}
-                    onChange={(e) => setEditDraft(e.target.value)}
-                    className="w-full h-36 p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-subtle)] text-sm text-[var(--text-primary)] resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-                  />
-                ) : (
-                  <p className="text-sm text-[var(--text-secondary)] leading-relaxed">{item.ai_draft}</p>
-                )}
+                {/* ── HITL Orchestration ──────────────────── */}
+                <div className="space-y-4">
+                  <h3 className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">
+                    Human-in-the-Loop (HITL) Orchestration
+                  </h3>
 
-                {/* RAG Sources */}
-                {item.rag_sources?.length > 0 && (
-                  <div className="mt-3 pt-3 border-t border-[var(--border-subtle)]">
-                    <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider mb-1.5 flex items-center gap-1">
-                      <BookOpen className="w-3 h-3" /> RAG Sources
-                    </p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {item.rag_sources.map((s: string, i: number) => (
-                        <span key={i} className="px-2 py-0.5 rounded-md text-[10px] bg-blue-500/10 text-blue-400 border border-blue-500/20">{s}</span>
-                      ))}
+                  {/* AI Draft Response Card */}
+                  <div className="hitl-response-card">
+                    <div className="hitl-response-header">
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="w-4 h-4 text-[var(--accent-primary)]" />
+                        <span>AI-Drafted Hybrid RAG Response</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs text-[var(--text-muted)] font-normal normal-case tracking-normal">
+                          Confidence score:
+                        </span>
+                        <ConfidenceRing value={item.confidence} />
+                        <div className="flex items-center gap-1">
+                          <button title="Regenerate draft" className="p-1.5 rounded-[var(--radius-sm)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)] transition-all">
+                            <RotateCcw className="w-3.5 h-3.5" />
+                          </button>
+                          <button title="Copy draft" className="p-1.5 rounded-[var(--radius-sm)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)] transition-all">
+                            <Copy className="w-3.5 h-3.5" />
+                          </button>
+                          <button title="Delete draft" className="p-1.5 rounded-[var(--radius-sm)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)] transition-all">
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                          <button title="More actions" className="p-1.5 rounded-[var(--radius-sm)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)] transition-all">
+                            <MoreHorizontal className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="hitl-response-body">
+                      {editing ? (
+                        <textarea
+                          value={editDraft}
+                          onChange={(e) => setEditDraft(e.target.value)}
+                          placeholder="Edit the AI-drafted response..."
+                          className="w-full h-44 p-4 rounded-[var(--radius-md)] bg-[var(--bg-primary)] border border-[var(--border-subtle)] text-sm text-[var(--text-primary)] resize-none focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]/20 transition-all"
+                        />
+                      ) : (
+                        <div className="space-y-3 text-sm leading-relaxed">
+                          <p>Dear Customer response,</p>
+                          <p><strong>Problem Acknowledgment:</strong><br />{editDraft || item.ai_draft || "Draft pending from /api/v1/ai/draft."}</p>
+                          <p><strong>Resolution Steps:</strong><br />1. Enter the steps, look at for the best services and resolution strategies.</p>
+                          <p><strong>Follow-up:</strong> We will take your e-mail customer services and resolve with our resolution.</p>
+                        </div>
+                      )}
+
+                      {/* RAG Sources */}
+                      {item.rag_sources?.length > 0 && (
+                        <div className="mt-4 pt-4 border-t border-[var(--border-subtle)]">
+                          <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider mb-2 flex items-center gap-1">
+                            <BookOpen className="w-3 h-3" /> RAG Sources
+                          </p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {item.rag_sources.map((s, i) => (
+                              <span
+                                key={i}
+                                className="px-2.5 py-1 rounded-[var(--radius-sm)] text-[10px] bg-[var(--accent-primary)]/8 text-[var(--accent-primary)] border border-[var(--accent-primary)]/15"
+                              >
+                                {s}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
-                )}
-              </div>
 
-              {/* Actions */}
-              <div className="flex items-center gap-3">
-                <button onClick={() => handleAction("approve")}
-                  className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm text-white bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 transition-all shadow-lg shadow-emerald-500/20">
-                  <Send className="w-4 h-4" /> {item.auto_approvable ? "1-Click Approve & Send" : "Approve & Send"}
-                </button>
-                {editing && (
-                  <button onClick={() => handleAction("edit")}
-                    className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm text-white bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 transition-all shadow-lg shadow-blue-500/20">
-                    <Edit3 className="w-4 h-4" /> Send Edited + RLHF Signal
-                  </button>
-                )}
-                <button onClick={() => handleAction("escalate")}
-                  className="px-6 py-3 rounded-xl font-semibold text-sm text-[var(--text-secondary)] border border-[var(--border-subtle)] hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/30 transition-all">
-                  <AlertTriangle className="w-4 h-4" />
-                </button>
-              </div>
-            </>
-          )}
+                  {/* ── HITL Action Buttons ────────────────── */}
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => handleAction("approve")}
+                      disabled={actionLoading !== null}
+                      className="hitl-btn-approve flex items-center justify-center gap-2 flex-1"
+                    >
+                      <Send className="w-4 h-4" />
+                      {actionLoading === "approve" ? "Sending…" : "HITL 1-CLICK APPROVE"}
+                    </button>
+
+                    {editing ? (
+                      <button
+                        onClick={() => handleAction("edit")}
+                        disabled={actionLoading !== null}
+                        className="hitl-btn-edit flex items-center justify-center gap-2 flex-1"
+                      >
+                        <Edit3 className="w-4 h-4" />
+                        {actionLoading === "edit" ? "Sending…" : "SEND EDITED + RLHF"}
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => setEditing(true)}
+                        className="hitl-btn-edit flex items-center justify-center gap-2 flex-1"
+                      >
+                        <Edit3 className="w-4 h-4" />
+                        MANUAL EDIT
+                      </button>
+                    )}
+                  </div>
+
+                  {/* ── Handoff Actions ─────────────────── */}
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={async () => {
+                        const waLink = (await createHandoffLink(item.id, "whatsapp")).deep_link;
+                        setEditDraft(
+                          editDraft + `\n\n---\n📱 Continue on WhatsApp for guided support: ${waLink}`
+                        );
+                        setEditing(true);
+                      }}
+                      className="hitl-btn-handoff-wa flex items-center justify-center gap-2 flex-1"
+                    >
+                      <MessageCircle className="w-4 h-4" />
+                      Handoff to WhatsApp
+                    </button>
+                    <button
+                      onClick={async () => {
+                        const chatToken = (await createHandoffLink(item.id, "chatbot")).deep_link.replace(/^.*\/chat\//, "");
+                        setEditDraft(
+                          editDraft + `\n\n---\n🤖 Continue with our AI assistant for step-by-step help: ${window.location.origin}/chat/${chatToken}`
+                        );
+                        setEditing(true);
+                      }}
+                      className="hitl-btn-handoff-bot flex items-center justify-center gap-2 flex-1"
+                    >
+                      <Bot className="w-4 h-4" />
+                      Handoff to AI Chatbot
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
     </div>

@@ -1,137 +1,210 @@
-"""
-AI Service Abstraction — Routes between mock data and real AI providers.
+"""Live AI contracts for Gemini reasoning, embeddings, Hybrid RAG, and RLHF."""
 
-Toggle via USE_MOCK_DATA env var. When False, calls Gemini 1.5 Pro for
-NLP / RAG drafting and Pinecone for vector identity resolution.
-"""
+from __future__ import annotations
+
+import json
 import logging
+import re
+from typing import Any
+
+import httpx
+
 from config import settings
+from services.vector_store import query_vectors, upsert_vector
 
 logger = logging.getLogger("aura_cx.ai")
 
 
-# ── Stage 2: NLP Classification ───────────────────────────────────
+class AIConfigurationError(RuntimeError):
+    pass
+
+
+def _require_gemini() -> None:
+    if not settings.GEMINI_API_KEY:
+        raise AIConfigurationError("GEMINI_API_KEY is not configured")
+
+
+def _sanitize_user_input(text: str, max_length: int = 12_000) -> str:
+    text = (text or "")[:max_length]
+    patterns = [
+        r"(?i)\bignore\s+(all\s+)?previous\s+instructions\b",
+        r"(?i)\byou\s+are\s+now\b",
+        r"(?i)\bsystem\s*:\s*",
+        r"(?i)\bassistant\s*:\s*",
+        r"(?i)\bdeveloper\s*:\s*",
+        r"(?i)\bdo\s+not\s+follow\s+(the\s+)?(above|previous)\b",
+    ]
+    for pattern in patterns:
+        text = re.sub(pattern, "[FILTERED]", text)
+    return text.strip()
+
+
+def _extract_json(text: str) -> dict[str, Any]:
+    text = text.strip()
+    if text.startswith("```"):
+        text = re.sub(r"^```(?:json)?", "", text).strip()
+        text = re.sub(r"```$", "", text).strip()
+    start = text.find("{")
+    end = text.rfind("}")
+    if start >= 0 and end > start:
+        text = text[start : end + 1]
+    return json.loads(text)
+
+
+async def gemini_generate(prompt: str, *, response_json: bool = False) -> str:
+    _require_gemini()
+    generation_config = {"temperature": 0.2}
+    if response_json:
+        generation_config["response_mime_type"] = "application/json"
+    async with httpx.AsyncClient(timeout=45.0) as client:
+        response = await client.post(
+            f"https://generativelanguage.googleapis.com/v1beta/models/{settings.GEMINI_MODEL}:generateContent",
+            params={"key": settings.GEMINI_API_KEY},
+            json={
+                "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+                "generationConfig": generation_config,
+            },
+        )
+        response.raise_for_status()
+        data = response.json()
+        return data["candidates"][0]["content"]["parts"][0]["text"]
+
+
+async def embed_text(text: str) -> list[float]:
+    _require_gemini()
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        response = await client.post(
+            f"https://generativelanguage.googleapis.com/v1beta/models/{settings.GEMINI_EMBEDDING_MODEL}:embedContent",
+            params={"key": settings.GEMINI_API_KEY},
+            json={"content": {"parts": [{"text": _sanitize_user_input(text, 8_000)}]}},
+        )
+        response.raise_for_status()
+        return response.json()["embedding"]["values"]
+
+
 async def classify_ticket(text: str, channel: str) -> dict:
-    """Multi-label zero-shot classification + sentiment velocity."""
-    if settings.USE_MOCK_DATA:
-        from services.mock_data import generate_live_ticket
-        t = generate_live_ticket()
-        return {
-            "intent": t["intent"],
-            "severity": t["severity"],
-            "sentiment": t["sentiment"],
-            "sentiment_score": t["sentiment_score"],
-            "confidence": t["confidence"],
-            "labels": [t["intent"]],
+    prompt = f"""
+Classify this customer support message from channel "{channel}".
+Return strict JSON only:
+{{
+  "intent": "Bug Report | Feature Request | Account Issue | Billing Dispute | Security Concern | Performance Issue | Other",
+  "severity": "critical | high | medium | low",
+  "sentiment": "furious | frustrated | neutral | satisfied",
+  "sentiment_score": -1.0,
+  "confidence": 0.0,
+  "product": "short product or service name"
+}}
+
+Message:
+{_sanitize_user_input(text)}
+"""
+    try:
+        return _extract_json(await gemini_generate(prompt, response_json=True))
+    except AIConfigurationError:
+        raise
+    except Exception:
+        logger.exception("Gemini classification failed")
+        raise
+
+
+async def resolve_identity(*, tenant_id: str, embedding: list[float], channel: str, handle: str) -> dict:
+    matches = await query_vectors(
+        tenant_id=tenant_id,
+        bucket="identities",
+        vector=embedding,
+        top_k=5,
+    )
+    best = matches[0] if matches else None
+    score = float(best["score"]) if best else 0.0
+    return {
+        "matched": bool(best and score >= settings.COSINE_THRESHOLD),
+        "cosine_similarity": score,
+        "profile_id": (best.get("metadata") or {}).get("profile_id") if best else None,
+        "channel": channel,
+        "handle": handle,
+        "method": "Vector Similarity (Cosine > 0.92)",
+    }
+
+
+async def upsert_identity_vector(*, tenant_id: str, profile_id: str, channel: str, handle: str, vector: list[float]) -> None:
+    await upsert_vector(
+        tenant_id=tenant_id,
+        bucket="identities",
+        vector_id=f"{profile_id}:{channel}:{handle}",
+        vector=vector,
+        metadata={"profile_id": profile_id, "channel": channel, "handle": handle},
+    )
+
+
+async def retrieve_rag_context(*, tenant_id: str, query_embedding: list[float], limit: int = 5) -> list[dict]:
+    matches = await query_vectors(tenant_id=tenant_id, bucket="knowledge", vector=query_embedding, top_k=limit)
+    return [
+        {
+            "id": match["id"],
+            "score": match["score"],
+            "title": match.get("metadata", {}).get("title", "Knowledge document"),
+            "source_uri": match.get("metadata", {}).get("source_uri"),
+            "body": match.get("metadata", {}).get("body", ""),
         }
-
-    # Real path — Gemini 1.5 Pro zero-shot classification
-    import httpx
-    async with httpx.AsyncClient() as client:
-        resp = await client.post(
-            f"https://generativelanguage.googleapis.com/v1beta/models/{settings.GEMINI_MODEL}:generateContent",
-            params={"key": settings.GEMINI_API_KEY},
-            json={
-                "contents": [{"parts": [{"text": (
-                    f"Classify this customer message from {channel}. Return JSON with: "
-                    f"intent (one of: Bug Report, Feature Request, Account Issue, Billing Dispute, Security Concern, Performance Issue), "
-                    f"severity (critical/high/medium/low), sentiment (furious/frustrated/neutral/satisfied), "
-                    f"sentiment_score (-1 to 1), confidence (0-1).\n\nMessage: {text}"
-                )}]}],
-            },
-            timeout=30.0,
-        )
-        resp.raise_for_status()
-        return resp.json()
+        for match in matches
+        if match.get("score", 0) > 0.55
+    ]
 
 
-# ── Stage 2: Vector Identity Resolution ───────────────────────────
-async def resolve_identity(embedding: list[float], customer_id: str | None = None) -> dict:
-    """Match identities across channels via cosine similarity > 0.92."""
-    if settings.USE_MOCK_DATA:
-        from services.mock_data import generate_golden_profile
-        profile = generate_golden_profile()
-        return {
-            "matched": True,
-            "cosine_similarity": profile["identity_resolution"]["cosine_similarity"],
-            "profile_id": profile["id"],
-            "method": "mock",
-        }
+async def generate_draft(*, tenant_id: str, ticket: dict) -> dict:
+    query_embedding = await embed_text(ticket.get("message", ""))
+    context_docs = await retrieve_rag_context(tenant_id=tenant_id, query_embedding=query_embedding)
+    context = "\n\n".join(
+        f"[{doc['id']}] {doc['title']}\n{doc.get('body') or doc.get('source_uri') or ''}"
+        for doc in context_docs
+    )
+    prompt = f"""
+You are AURA-CX, an expert enterprise support copilot.
+Use only tenant knowledge context below. If context is insufficient, say what you need from the agent.
+Draft a concise, empathetic response suitable for the customer channel.
+Do not reveal internal policy IDs unless they help the agent verify the source.
 
-    # Real path — Pinecone query
-    import httpx
-    async with httpx.AsyncClient() as client:
-        resp = await client.post(
-            f"https://{settings.PINECONE_INDEX}-{settings.PINECONE_ENVIRONMENT}.svc.pinecone.io/query",
-            headers={"Api-Key": settings.PINECONE_API_KEY},
-            json={"vector": embedding, "topK": 5, "includeMetadata": True},
-            timeout=15.0,
-        )
-        resp.raise_for_status()
-        matches = resp.json().get("matches", [])
-        best = matches[0] if matches else None
-        return {
-            "matched": best is not None and best["score"] >= settings.COSINE_THRESHOLD,
-            "cosine_similarity": best["score"] if best else 0.0,
-            "profile_id": best["metadata"].get("profile_id") if best else None,
-            "method": "pinecone",
-        }
+Tenant knowledge:
+{context or "No matching tenant knowledge documents were retrieved."}
 
+Ticket:
+Channel: {ticket.get("channel")}
+Customer: {_sanitize_user_input(ticket.get("customer_name", ""))}
+Product: {_sanitize_user_input(ticket.get("product", ""))}
+Message: {_sanitize_user_input(ticket.get("message", ""))}
 
-# ── Stage 3: Hybrid RAG Draft Generation ──────────────────────────
-async def generate_draft(ticket: dict, context_docs: list[str]) -> dict:
-    """Generate AI draft response using RAG context."""
-    if settings.USE_MOCK_DATA:
-        from services.mock_data import DRAFT_RESPONSES, CUSTOMER_NAMES
-        import random
-        name = ticket.get("customer_name", random.choice(CUSTOMER_NAMES))
-        product = ticket.get("product", "the product")
-        draft = random.choice(DRAFT_RESPONSES).format(name=name, product=product, amount=random.choice([149, 299, 499]))
-        confidence = round(random.uniform(0.70, 0.97), 2)
-        return {
-            "draft": draft,
-            "confidence": confidence,
-            "auto_approvable": confidence > settings.DRAFT_CONFIDENCE_THRESHOLD,
-            "rag_sources": context_docs[:3],
-        }
-
-    # Real path — Gemini 1.5 Pro with RAG context
-    import httpx
-    context = "\n---\n".join(context_docs)
-    async with httpx.AsyncClient() as client:
-        resp = await client.post(
-            f"https://generativelanguage.googleapis.com/v1beta/models/{settings.GEMINI_MODEL}:generateContent",
-            params={"key": settings.GEMINI_API_KEY},
-            json={
-                "contents": [{"parts": [{"text": (
-                    f"You are an expert CX agent. Draft a professional, empathetic response.\n\n"
-                    f"CONTEXT DOCS:\n{context}\n\n"
-                    f"TICKET:\nChannel: {ticket.get('channel')}\n"
-                    f"Customer: {ticket.get('customer_name')}\n"
-                    f"Message: {ticket.get('message')}\n\n"
-                    f"Respond with the draft only."
-                )}]}],
-            },
-            timeout=30.0,
-        )
-        resp.raise_for_status()
-        text = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
-        return {
-            "draft": text,
-            "confidence": 0.88,
-            "auto_approvable": True,
-            "rag_sources": context_docs[:3],
-        }
+Return strict JSON:
+{{
+  "draft": "customer-ready draft",
+  "confidence": 0.0,
+  "auto_approvable": false,
+  "needs_human_detail": true
+}}
+"""
+    result = _extract_json(await gemini_generate(prompt, response_json=True))
+    confidence = float(result.get("confidence") or 0)
+    return {
+        "draft": str(result.get("draft") or "").strip(),
+        "confidence": max(0.0, min(1.0, confidence)),
+        "auto_approvable": confidence >= settings.DRAFT_CONFIDENCE_THRESHOLD and not bool(result.get("needs_human_detail")),
+        "rag_sources": context_docs,
+    }
 
 
-# ── Stage 4: RLHF Signal Recorder ─────────────────────────────────
-async def record_rlhf_signal(ticket_id: str, signal_type: str, original_draft: str, edited_draft: str | None = None) -> dict:
-    """Record agent feedback for RLHF training loop."""
-    logger.info("RLHF signal: ticket=%s type=%s", ticket_id, signal_type)
+async def record_rlhf_signal(
+    *,
+    tenant_id: str,
+    ticket_id: str,
+    signal_type: str,
+    original_draft: str,
+    edited_draft: str | None,
+) -> dict:
     return {
         "ticket_id": ticket_id,
+        "tenant_id": tenant_id,
         "signal_type": signal_type,
         "recorded": True,
-        "pipeline_stage": "stage_4_rlhf",
-        "message": f"RLHF {signal_type} signal queued for model fine-tuning.",
+        "pipeline_stage": "rlhf_feedback",
+        "message": "Correction queued for tenant-scoped RLHF review.",
     }
+

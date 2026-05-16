@@ -1,14 +1,15 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 
-export type UserRole = "super_admin" | "company_chief" | "senior_developer" | "support_manager" | "support_agent";
+export type UserRole = "super_admin" | "tenant_admin" | "executive" | "qa_reviewer" | "support_agent";
 
 export interface User {
+  id: string;
   email: string;
   name: string;
   role: UserRole;
-  tenant_id: string;
+  tenant_id: string | null;
   avatar: string;
   role_info?: {
     label: string;
@@ -25,28 +26,36 @@ interface AuthState {
   logout: () => void;
 }
 
-const AuthContext = createContext<AuthState | undefined>(undefined);
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const AuthContext = createContext<AuthState | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  // Hydrate from localStorage
-  useEffect(() => {
+  const readStoredAuth = () => {
+    if (typeof window === "undefined") {
+      return { user: null as User | null, token: null as string | null, loading: true };
+    }
     const saved = localStorage.getItem("aura_token");
     const savedUser = localStorage.getItem("aura_user");
     if (saved && savedUser) {
-      setToken(saved);
       try {
-        setUser(JSON.parse(savedUser));
+        return { user: JSON.parse(savedUser) as User, token: saved, loading: false };
       } catch {
         localStorage.removeItem("aura_token");
         localStorage.removeItem("aura_user");
       }
     }
-    setLoading(false);
+    return { user: null as User | null, token: null as string | null, loading: false };
+  };
+  const [auth, setAuth] = useState<{ user: User | null; token: string | null; loading: boolean }>({
+    user: null,
+    token: null,
+    loading: true,
+  });
+  const { user, token, loading } = auth;
+
+  useEffect(() => {
+    const raf = requestAnimationFrame(() => setAuth(readStoredAuth()));
+    return () => cancelAnimationFrame(raf);
   }, []);
 
   const login = useCallback(async (email: string, password: string) => {
@@ -59,31 +68,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: form.toString(),
     });
-
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       throw new Error(err.detail || "Login failed");
     }
 
     const data = await res.json();
-    setToken(data.access_token);
-    setUser(data.user);
+    setAuth({ user: data.user, token: data.access_token, loading: false });
     localStorage.setItem("aura_token", data.access_token);
     localStorage.setItem("aura_user", JSON.stringify(data.user));
+    document.cookie = `aura_token=${data.access_token}; path=/; max-age=${8 * 3600}; SameSite=Lax`;
   }, []);
 
   const logout = useCallback(() => {
-    setToken(null);
-    setUser(null);
+    setAuth({ user: null, token: null, loading: false });
     localStorage.removeItem("aura_token");
     localStorage.removeItem("aura_user");
+    document.cookie = "aura_token=; path=/; max-age=0; SameSite=Lax";
   }, []);
 
-  return (
-    <AuthContext.Provider value={{ user, token, loading, login, logout }}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={{ user, token, loading, login, logout }}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {
@@ -92,32 +96,40 @@ export function useAuth() {
   return ctx;
 }
 
-/** Role hierarchy check */
-const ROLE_HIERARCHY: Record<UserRole, number> = {
-  super_admin: 5,
-  company_chief: 4,
-  senior_developer: 3,
-  support_manager: 2,
-  support_agent: 1,
-};
-
-export function hasAccess(userRole: UserRole, requiredRole: UserRole): boolean {
-  return ROLE_HIERARCHY[userRole] >= ROLE_HIERARCHY[requiredRole];
-}
-
-/** Allowed dashboard paths per role */
 export const ROLE_ROUTES: Record<UserRole, string[]> = {
-  super_admin: ["/dashboard", "/dashboard/admin", "/dashboard/analytics", "/dashboard/profiles", "/dashboard/hitl", "/dashboard/shadow-tickets", "/dashboard/qa-review", "/dashboard/integrations", "/dashboard/subscriptions", "/dashboard/executive"],
-  company_chief: ["/dashboard", "/dashboard/executive", "/dashboard/analytics", "/dashboard/subscriptions"],
-  senior_developer: ["/dashboard", "/dashboard/shadow-tickets", "/dashboard/analytics"],
-  support_manager: ["/dashboard", "/dashboard/qa-review", "/dashboard/analytics", "/dashboard/profiles"],
+  super_admin: [
+    "/dashboard",
+    "/dashboard/admin",
+    "/dashboard/analytics",
+    "/dashboard/profiles",
+    "/dashboard/hitl",
+    "/dashboard/shadow-tickets",
+    "/dashboard/qa-review",
+    "/dashboard/integrations",
+    "/dashboard/subscriptions",
+    "/dashboard/executive",
+  ],
+  tenant_admin: [
+    "/dashboard",
+    "/dashboard/admin",
+    "/dashboard/analytics",
+    "/dashboard/profiles",
+    "/dashboard/hitl",
+    "/dashboard/shadow-tickets",
+    "/dashboard/qa-review",
+    "/dashboard/integrations",
+    "/dashboard/subscriptions",
+    "/dashboard/executive",
+  ],
+  executive: ["/dashboard", "/dashboard/executive", "/dashboard/analytics", "/dashboard/subscriptions", "/dashboard/profiles"],
+  qa_reviewer: ["/dashboard", "/dashboard/qa-review", "/dashboard/hitl", "/dashboard/analytics", "/dashboard/profiles"],
   support_agent: ["/dashboard", "/dashboard/profiles", "/dashboard/hitl"],
 };
 
 export const ROLE_DEFAULT_ROUTE: Record<UserRole, string> = {
   super_admin: "/dashboard/admin",
-  company_chief: "/dashboard/executive",
-  senior_developer: "/dashboard/shadow-tickets",
-  support_manager: "/dashboard/qa-review",
+  tenant_admin: "/dashboard/admin",
+  executive: "/dashboard/executive",
+  qa_reviewer: "/dashboard/qa-review",
   support_agent: "/dashboard",
 };

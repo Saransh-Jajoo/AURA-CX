@@ -4,4 +4,7 @@ __pycache__/
 node_modules/
 .next/
 .env
+.env.local
+.env.production
 .venv/
+*.pem
