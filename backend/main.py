@@ -23,7 +23,19 @@ from services.realtime import manager, ticket_to_dict
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    await init_db()
+    import logging
+    logger = logging.getLogger("aura_cx.startup")
+    try:
+        await init_db()
+        logger.info("✅ Database initialized successfully.")
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(
+            "⚠️  Database connection failed at startup (%s: %s). "
+            "The API will start but DB-dependent endpoints will return errors. "
+            "Set DATABASE_URL to a reachable PostgreSQL instance.",
+            type(exc).__name__,
+            exc,
+        )
     yield
 
 
