@@ -11,11 +11,14 @@ from sqlalchemy import select
 
 from config import settings
 from database import SessionLocal, init_db
+from middleware.rate_limiter import RateLimiterMiddleware
+from middleware.security_headers import SecurityHeadersMiddleware
 from models import Ticket, User
 from routers import ai as ai_router
 from routers import (
     analytics, auth, compliance, ingestion, integrations, knowledge,
-    profiles, settings as settings_router, subscriptions, team, tenants, tickets, voice,
+    profiles, settings as settings_router, social_monitor,
+    subscriptions, team, tenants, tickets, voice,
 )
 from security import decode_token
 from services.realtime import manager, ticket_to_dict
@@ -58,6 +61,10 @@ app.add_middleware(
     allow_headers=["Authorization", "Content-Type", "X-AURA-WEBHOOK-SECRET"],
 )
 
+# ── Security middleware (order matters: first added = outermost) ──────────────
+app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(RateLimiterMiddleware)
+
 app.include_router(auth.router, prefix="/api/v1", tags=["Auth"])
 app.include_router(tenants.router, prefix="/api/v1", tags=["Tenants"])
 app.include_router(integrations.router, prefix="/api/v1", tags=["Integrations"])
@@ -72,6 +79,7 @@ app.include_router(knowledge.router, prefix="/api/v1", tags=["Knowledge"])
 app.include_router(settings_router.router, prefix="/api/v1", tags=["Settings"])
 app.include_router(voice.router, prefix="/api/v1", tags=["Voice"])
 app.include_router(compliance.router, prefix="/api/v1", tags=["Compliance"])
+app.include_router(social_monitor.router, prefix="/api/v1", tags=["Social Monitor"])
 
 
 @app.get("/health")
@@ -97,6 +105,7 @@ async def health_check():
             "compliance_audit": "active",
             "campaign_engine": "active",
             "multilingual": "active",
+            "social_monitor": "active" if settings.X_BEARER_TOKEN or settings.IMAP_HOST else "needs_configuration",
         },
         "providers": {
             "gemini": bool(settings.GEMINI_API_KEY),
@@ -106,6 +115,9 @@ async def health_check():
             "redis": bool(settings.REDIS_URL),
             "twilio": bool(settings.TWILIO_ACCOUNT_SID),
             "encryption": bool(settings.ENCRYPTION_KEY or settings.SECRET_KEY),
+            "x_api": bool(settings.X_BEARER_TOKEN),
+            "threads": bool(settings.THREADS_ACCESS_TOKEN),
+            "email_monitor": bool(settings.IMAP_HOST and settings.IMAP_USER),
         },
     }
 

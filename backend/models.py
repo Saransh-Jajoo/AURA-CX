@@ -354,3 +354,52 @@ class AuditEvent(Base):
     ip_address: Mapped[str | None] = mapped_column(String(64))
     user_agent: Mapped[str | None] = mapped_column(String(512))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+
+
+# ── Social Monitor Configuration ──────────────────────────────
+class SocialMonitorConfig(Base):
+    """Per-tenant social monitoring configuration."""
+    __tablename__ = "social_monitor_configs"
+    __table_args__ = (UniqueConstraint("tenant_id", "platform", "target_type", "target_value", name="uq_monitor_target"),)
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True, default=lambda: new_id("smc"))
+    tenant_id: Mapped[str] = mapped_column(ForeignKey("tenants.id", ondelete="CASCADE"), index=True, nullable=False)
+    platform: Mapped[str] = mapped_column(String(32), index=True, nullable=False)  # x, email, threads
+    target_type: Mapped[str] = mapped_column(String(32), nullable=False)  # mention, hashtag, keyword, inbox
+    target_value: Mapped[str] = mapped_column(String(512), nullable=False)  # @handle, #tag, keyword, email
+    label: Mapped[str | None] = mapped_column(String(255))
+    active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    last_polled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    poll_cursor: Mapped[str | None] = mapped_column(String(512))  # platform-specific pagination cursor
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+
+
+# ── Social Mention ────────────────────────────────────────────
+class SocialMention(Base):
+    """Raw social media mentions with NLP complaint classification."""
+    __tablename__ = "social_mentions"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True, default=lambda: new_id("sm"))
+    tenant_id: Mapped[str] = mapped_column(ForeignKey("tenants.id", ondelete="CASCADE"), index=True, nullable=False)
+    monitor_config_id: Mapped[str] = mapped_column(ForeignKey("social_monitor_configs.id", ondelete="CASCADE"), index=True, nullable=False)
+    platform: Mapped[str] = mapped_column(String(32), index=True, nullable=False)
+    external_id: Mapped[str] = mapped_column(String(512), index=True, nullable=False)
+    author_handle: Mapped[str] = mapped_column(String(512), nullable=False)
+    author_name: Mapped[str | None] = mapped_column(String(255))
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    content_url: Mapped[str | None] = mapped_column(String(1024))
+    # NLP Classification
+    is_complaint: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    complaint_confidence: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    complaint_category: Mapped[str | None] = mapped_column(String(128))
+    sentiment: Mapped[str] = mapped_column(String(64), default="neutral", nullable=False)
+    sentiment_score: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    nlp_summary: Mapped[str | None] = mapped_column(Text)
+    detected_language: Mapped[str] = mapped_column(String(8), default="en", nullable=False)
+    # Ticket promotion
+    promoted_to_ticket_id: Mapped[str | None] = mapped_column(ForeignKey("tickets.id", ondelete="SET NULL"), index=True)
+    promoted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    promoted_by: Mapped[str | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    # Metadata
+    raw_metadata: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+    captured_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True, nullable=False)

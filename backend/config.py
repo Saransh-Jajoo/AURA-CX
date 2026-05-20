@@ -1,7 +1,7 @@
 """Environment-driven configuration for the AURA-CX API.
 
 Enterprise extension: adds Redis/Celery, encryption, multilingual,
-voice, campaign, and compliance settings.
+voice, campaign, compliance, rate limiting, and social monitor settings.
 """
 
 from __future__ import annotations
@@ -22,7 +22,8 @@ class Settings(BaseSettings):
 
     SECRET_KEY: str = ""
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 480
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     BOOTSTRAP_TENANT_ID: str = "tenant-default"
     BOOTSTRAP_TENANT_NAME: str = "AURA-CX Workspace"
     BOOTSTRAP_ADMIN_EMAIL: str = ""
@@ -60,11 +61,16 @@ class Settings(BaseSettings):
 
     # ── Redis / Celery ───────────────────────────────────────
     REDIS_URL: str = "redis://redis:6379/0"
+    REDIS_PASSWORD: str = ""
     CELERY_BROKER_URL: str = "redis://redis:6379/1"
     CELERY_RESULT_BACKEND: str = "redis://redis:6379/2"
 
     # ── Encryption ───────────────────────────────────────────
     ENCRYPTION_KEY: str = ""  # Fernet key for BYOI credential encryption
+
+    # ── Rate Limiting ────────────────────────────────────────
+    RATE_LIMIT_PER_TENANT: int = 500   # requests per minute per tenant
+    RATE_LIMIT_WEBHOOK_PER_IP: int = 20  # webhook POSTs per minute per IP
 
     # ── SLA Defaults (minutes) ───────────────────────────────
     SLA_P1_MINUTES: int = 30
@@ -85,6 +91,17 @@ class Settings(BaseSettings):
     # ── Campaign Engine ──────────────────────────────────────
     SENTIMENT_DROP_THRESHOLD: float = -0.40
     CHURN_RISK_THRESHOLD: float = 0.65
+
+    # ── Social Monitor ───────────────────────────────────────
+    X_BEARER_TOKEN: str = ""
+    THREADS_ACCESS_TOKEN: str = ""
+    IMAP_HOST: str = ""
+    IMAP_PORT: int = 993
+    IMAP_USER: str = ""
+    IMAP_PASSWORD: str = ""
+    IMAP_USE_SSL: bool = True
+    SOCIAL_MONITOR_POLL_INTERVAL: int = 300  # seconds
+    COMPLAINT_CONFIDENCE_THRESHOLD: float = 0.70
 
     @field_validator("VECTOR_PROVIDER")
     @classmethod

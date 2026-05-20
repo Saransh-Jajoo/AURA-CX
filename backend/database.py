@@ -24,6 +24,17 @@ async def get_session():
         yield session
 
 
+async def set_tenant_context(session: AsyncSession, tenant_id: str) -> None:
+    """Set the current tenant for Row-Level Security policies.
+    
+    Call this at the start of request handlers that need RLS enforcement.
+    The tenant_id is parameterized to prevent SQL injection.
+    """
+    from sqlalchemy import text
+    # Use parameterized query to prevent SQL injection
+    await session.execute(text("SET app.current_tenant = :tid"), {"tid": tenant_id})
+
+
 async def init_db() -> None:
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)

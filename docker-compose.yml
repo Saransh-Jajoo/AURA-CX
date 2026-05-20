@@ -1,39 +1,59 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# AURA-CX Docker Compose — Production Configuration
+# ═══════════════════════════════════════════════════════════════════════════════
+# All secrets use ${VAR:?...} — Docker Compose will REFUSE to start if unset.
+# Create a .env file in the project root with all required variables.
+# ═══════════════════════════════════════════════════════════════════════════════
+
 services:
+  # ── PostgreSQL ────────────────────────────────────────────────────────────
   postgres:
     image: postgres:16-alpine
     environment:
       POSTGRES_DB: aura_cx
-      POSTGRES_USER: aura
-      POSTGRES_PASSWORD: aura
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER must be set}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
     ports:
       - "5432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U aura -d aura_cx"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:?POSTGRES_USER must be set} -d aura_cx"]
       interval: 10s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
 
+  # ── Redis (AUTH-protected) ────────────────────────────────────────────────
   redis:
     image: redis:7-alpine
+    command: >-
+      redis-server
+        --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD must be set}
+        --maxmemory 256mb
+        --maxmemory-policy allkeys-lru
+        --appendonly yes
     ports:
       - "6379:6379"
     volumes:
       - redis-data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:?REDIS_PASSWORD must be set}", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
 
+  # ── ChromaDB (vector store) ───────────────────────────────────────────────
   chroma:
     image: chromadb/chroma:latest
     ports:
       - "8001:8000"
     volumes:
       - chroma-data:/chroma/chroma
+    restart: unless-stopped
 
+  # ── Backend (FastAPI + Celery) ────────────────────────────────────────────
   backend:
     build:
       context: ./backend
@@ -45,40 +65,109 @@ services:
       chroma:
         condition: service_started
     environment:
+      # ── Core ──────────────────────────────────────────────
       USE_MOCK_DATA: "false"
       ENVIRONMENT: production
       FRONTEND_URL: http://localhost:3000
-      DATABASE_URL: postgresql+asyncpg://aura:aura@postgres:5432/aura_cx
-      SECRET_KEY: ${SECRET_KEY:-local-dev-secret-change-before-production-1234567890}
-      BOOTSTRAP_TENANT_ID: ${BOOTSTRAP_TENANT_ID:-tenant-default}
-      BOOTSTRAP_TENANT_NAME: ${BOOTSTRAP_TENANT_NAME:-AURA-CX Workspace}
-      BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-admin@example.com}
-      BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:-ChangeMeNow12345}
-      WEBHOOK_SIGNING_SECRET: ${WEBHOOK_SIGNING_SECRET:-}
-      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:?POSTGRES_USER must be set}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/aura_cx
+      # ── Auth ──────────────────────────────────────────────
+      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY must be set}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-15}
+      REFRESH_TOKEN_EXPIRE_DAYS: ${REFRESH_TOKEN_EXPIRE_DAYS:-7}
+      # ── Bootstrap ─────────────────────────────────────────
+      BOOTSTRAP_TENANT_ID: ${BOOTSTRAP_TENANT_ID:?BOOTSTRAP_TENANT_ID must be set}
+      BOOTSTRAP_TENANT_NAME: ${BOOTSTRAP_TENANT_NAME:?BOOTSTRAP_TENANT_NAME must be set}
+      BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:?BOOTSTRAP_ADMIN_EMAIL must be set}
+      BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:?BOOTSTRAP_ADMIN_PASSWORD must be set}
+      # ── Security ──────────────────────────────────────────
+      WEBHOOK_SIGNING_SECRET: ${WEBHOOK_SIGNING_SECRET:?WEBHOOK_SIGNING_SECRET must be set}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?ENCRYPTION_KEY must be set}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD must be set}
+      # ── Rate Limiting ─────────────────────────────────────
+      RATE_LIMIT_PER_TENANT: ${RATE_LIMIT_PER_TENANT:-500}
+      RATE_LIMIT_WEBHOOK_PER_IP: ${RATE_LIMIT_WEBHOOK_PER_IP:-20}
+      # ── Redis URLs (password injected) ────────────────────
+      REDIS_URL: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD must be set}@redis:6379/0
+      CELERY_BROKER_URL: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD must be set}@redis:6379/1
+      CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD must be set}@redis:6379/2
+      # ── AI / Gemini ───────────────────────────────────────
+      GEMINI_API_KEY: ${GEMINI_API_KEY:?GEMINI_API_KEY must be set}
       GEMINI_MODEL: ${GEMINI_MODEL:-gemini-1.5-pro-latest}
       GEMINI_EMBEDDING_MODEL: ${GEMINI_EMBEDDING_MODEL:-text-embedding-004}
+      # ── Vector Store ──────────────────────────────────────
       VECTOR_PROVIDER: ${VECTOR_PROVIDER:-chroma}
       PINECONE_API_KEY: ${PINECONE_API_KEY:-}
       PINECONE_HOST: ${PINECONE_HOST:-}
       CHROMA_HOST: chroma
       CHROMA_PORT: "8000"
       CHROMA_COLLECTION: ${CHROMA_COLLECTION:-aura_cx}
-      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
-      STRIPE_PRICE_STARTER: ${STRIPE_PRICE_STARTER:-}
-      STRIPE_PRICE_PRO: ${STRIPE_PRICE_PRO:-}
-      STRIPE_PRICE_ENTERPRISE: ${STRIPE_PRICE_ENTERPRISE:-}
-      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
-      REDIS_URL: redis://redis:6379/0
-      CELERY_BROKER_URL: redis://redis:6379/1
-      CELERY_RESULT_BACKEND: redis://redis:6379/2
-      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-}
-      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-}
-      TWILIO_PHONE_NUMBER: ${TWILIO_PHONE_NUMBER:-}
+      # ── Stripe ────────────────────────────────────────────
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:?STRIPE_SECRET_KEY must be set}
+      STRIPE_PRICE_STARTER: ${STRIPE_PRICE_STARTER:?STRIPE_PRICE_STARTER must be set}
+      STRIPE_PRICE_PRO: ${STRIPE_PRICE_PRO:?STRIPE_PRICE_PRO must be set}
+      STRIPE_PRICE_ENTERPRISE: ${STRIPE_PRICE_ENTERPRISE:?STRIPE_PRICE_ENTERPRISE must be set}
+      # ── Twilio ────────────────────────────────────────────
+      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:?TWILIO_ACCOUNT_SID must be set}
+      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:?TWILIO_AUTH_TOKEN must be set}
+      TWILIO_PHONE_NUMBER: ${TWILIO_PHONE_NUMBER:?TWILIO_PHONE_NUMBER must be set}
+      # ── Multilingual ──────────────────────────────────────
       SUPPORTED_LANGUAGES: ${SUPPORTED_LANGUAGES:-en,hi,mr,ta,bn,gu,te,kn,ml}
+      # ── Social Monitor ────────────────────────────────────
+      X_BEARER_TOKEN: ${X_BEARER_TOKEN:-}
+      THREADS_ACCESS_TOKEN: ${THREADS_ACCESS_TOKEN:-}
+      IMAP_HOST: ${IMAP_HOST:-}
+      IMAP_PORT: ${IMAP_PORT:-993}
+      IMAP_USER: ${IMAP_USER:-}
+      IMAP_PASSWORD: ${IMAP_PASSWORD:-}
+      IMAP_USE_SSL: ${IMAP_USE_SSL:-true}
+      SOCIAL_MONITOR_POLL_INTERVAL: ${SOCIAL_MONITOR_POLL_INTERVAL:-300}
+      COMPLAINT_CONFIDENCE_THRESHOLD: ${COMPLAINT_CONFIDENCE_THRESHOLD:-0.70}
     ports:
       - "8000:8000"
+    restart: unless-stopped
 
+  # ── Celery Worker ─────────────────────────────────────────────────────────
+  celery-worker:
+    build:
+      context: ./backend
+    command: celery -A celery_app worker -l info -Q default,sla,campaign,knowledge,voice,social,dlq
+    depends_on:
+      - backend
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:?POSTGRES_USER must be set}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/aura_cx
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD must be set}
+      REDIS_URL: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD must be set}@redis:6379/0
+      CELERY_BROKER_URL: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD must be set}@redis:6379/1
+      CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD must be set}@redis:6379/2
+      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY must be set}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?ENCRYPTION_KEY must be set}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:?GEMINI_API_KEY must be set}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-1.5-pro-latest}
+      X_BEARER_TOKEN: ${X_BEARER_TOKEN:-}
+      THREADS_ACCESS_TOKEN: ${THREADS_ACCESS_TOKEN:-}
+      IMAP_HOST: ${IMAP_HOST:-}
+      IMAP_PORT: ${IMAP_PORT:-993}
+      IMAP_USER: ${IMAP_USER:-}
+      IMAP_PASSWORD: ${IMAP_PASSWORD:-}
+      IMAP_USE_SSL: ${IMAP_USE_SSL:-true}
+      SOCIAL_MONITOR_POLL_INTERVAL: ${SOCIAL_MONITOR_POLL_INTERVAL:-300}
+      COMPLAINT_CONFIDENCE_THRESHOLD: ${COMPLAINT_CONFIDENCE_THRESHOLD:-0.70}
+    restart: unless-stopped
+
+  # ── Celery Beat (scheduler) ───────────────────────────────────────────────
+  celery-beat:
+    build:
+      context: ./backend
+    command: celery -A celery_app beat -l info --schedule /tmp/celerybeat-schedule
+    depends_on:
+      - redis
+    environment:
+      CELERY_BROKER_URL: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD must be set}@redis:6379/1
+      CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD must be set}@redis:6379/2
+      SOCIAL_MONITOR_POLL_INTERVAL: ${SOCIAL_MONITOR_POLL_INTERVAL:-300}
+    restart: unless-stopped
+
+  # ── Frontend (Next.js) ───────────────────────────────────────────────────
   frontend:
     build:
       context: ./frontend
@@ -88,9 +177,9 @@ services:
       - backend
     environment:
       NEXT_PUBLIC_API_URL: http://localhost:8000
-      SECRET_KEY: ${SECRET_KEY:-local-dev-secret-change-before-production-1234567890}
     ports:
       - "3000:3000"
+    restart: unless-stopped
 
 volumes:
   postgres-data:
