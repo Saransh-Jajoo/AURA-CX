@@ -1,14 +1,23 @@
 import type {
   AIDraftResponse,
+  AgentPerformance,
+  AIRecommendation,
+  CategoryData,
   ClusterData,
+  CSATTrend,
+  CustomerThreadState,
   GoldenProfile,
   HITLItem,
   KPIMetrics,
+  PrivateChannel,
   ProfileSummary,
+  ResolutionTimeData,
   RLHFResponse,
   RLHFSignal,
   ShadowTicket,
+  SLACompliance,
   Ticket,
+  ThreadState,
   TrendPoint,
 } from "./types";
 
@@ -210,6 +219,17 @@ export async function updateBYOIConfig(data: Record<string, unknown>) {
   });
 }
 
+export async function fetchPlatformConnections() {
+  return request<{ platforms: import("./types").PlatformConnections }>("/api/v1/settings/platforms");
+}
+
+export async function updatePlatformConnection(data: Record<string, unknown>) {
+  return request<{ status: string; platforms: import("./types").PlatformConnections; changed_platforms: string[] }>(
+    "/api/v1/settings/platforms",
+    { method: "PUT", body: JSON.stringify(data) }
+  );
+}
+
 // ── Voice / Call Recordings ─────────────────────────────────
 export async function fetchCalls(params?: { status?: string }) {
   const qs = params?.status ? `?status=${params.status}` : "";
@@ -244,3 +264,118 @@ export async function fetchComplianceSummary() {
 export async function exportAuditData(format: string = "json") {
   return request(`/api/v1/compliance/export?format=${format}`);
 }
+
+// ── Private Resolution Thread API ────────────────────────────
+
+export async function handoffToPrivateChannel(
+  ticketId: string,
+  data: {
+    channel: PrivateChannel;
+    address: string;
+    customer_name?: string;
+    intro_message?: string;
+  }
+) {
+  return request<{ status: string; channel: string; chat_url: string; token: string }>(
+    `/api/v1/tickets/${ticketId}/handoff-private`,
+    { method: "POST", body: JSON.stringify(data) }
+  );
+}
+
+export async function fetchTicketMessages(ticketId: string): Promise<ThreadState> {
+  return request<ThreadState>(`/api/v1/tickets/${ticketId}/messages`);
+}
+
+export async function sendAgentMessage(
+  ticketId: string,
+  content: string,
+  isInternal = false
+) {
+  return request<{ status: string; message: import("./types").TicketMessage }>(
+    `/api/v1/tickets/${ticketId}/messages`,
+    { method: "POST", body: JSON.stringify({ content, is_internal: isInternal }) }
+  );
+}
+
+export async function resolveTicketWithNote(
+  ticketId: string,
+  resolutionNote: string,
+  notifyCustomer = true
+) {
+  return request<{ status: string; resolved_at: string; resolution_note: string }>(
+    `/api/v1/tickets/${ticketId}/resolve`,
+    { method: "POST", body: JSON.stringify({ resolution_note: resolutionNote, notify_customer: notifyCustomer }) }
+  );
+}
+
+// Public (no auth) — customer-facing
+export async function fetchCustomerThread(token: string): Promise<CustomerThreadState> {
+  const res = await fetch(`${API_BASE}/api/v1/resolve/${token}`);
+  if (!res.ok) throw new Error("Thread not found");
+  return res.json();
+}
+
+export async function customerSendMessage(
+  token: string,
+  content: string,
+  senderName?: string
+) {
+  const res = await fetch(`${API_BASE}/api/v1/resolve/${token}/message`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ content, sender_name: senderName }),
+  });
+  if (!res.ok) throw new Error("Failed to send message");
+  return res.json();
+}
+
+export async function submitCSAT(token: string, score: number, comment = "") {
+  const res = await fetch(`${API_BASE}/api/v1/resolve/${token}/csat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ score, comment }),
+  });
+  if (!res.ok) throw new Error("Failed to submit CSAT");
+  return res.json();
+}
+
+// ── Analytics Intelligence API ───────────────────────────────
+
+export async function fetchCategories(
+  period: "24h" | "7d" | "30d" | "90d" = "7d"
+): Promise<{ categories: CategoryData[]; total: number; period: string }> {
+  return request(`/api/v1/analytics/categories?period=${period}`);
+}
+
+export async function fetchResolutionTime(
+  period: "7d" | "30d" | "90d" = "7d"
+): Promise<ResolutionTimeData> {
+  return request(`/api/v1/analytics/resolution-time?period=${period}`);
+}
+
+export async function fetchCSATTrend(
+  period: "7d" | "30d" | "90d" = "30d"
+): Promise<CSATTrend> {
+  return request(`/api/v1/analytics/csat-trend?period=${period}`);
+}
+
+export async function fetchSLACompliance(
+  period: "7d" | "30d" | "90d" = "7d"
+): Promise<SLACompliance> {
+  return request(`/api/v1/analytics/sla?period=${period}`);
+}
+
+export async function fetchAgentPerformance(
+  period: "7d" | "30d" | "90d" = "7d"
+): Promise<{ agents: AgentPerformance[]; period: string }> {
+  return request(`/api/v1/analytics/agents?period=${period}`);
+}
+
+export async function fetchRecommendations(): Promise<{
+  recommendations: AIRecommendation[];
+  source: string;
+  data_points: number;
+}> {
+  return request("/api/v1/analytics/recommendations");
+}
+

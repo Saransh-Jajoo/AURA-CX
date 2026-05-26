@@ -311,6 +311,43 @@ export interface TenantSettings {
   created_at: string;
 }
 
+// ── Platform Connections ─────────────────────────────────────
+export interface XPlatformStatus {
+  connected: boolean;
+  has_bearer_token: boolean;
+  has_oauth: boolean;
+  has_user_tokens: boolean;
+  masked_bearer: string;
+  masked_api_key: string;
+}
+
+export interface RedditPlatformStatus {
+  connected: boolean;
+  has_client_creds: boolean;
+  has_account: boolean;
+  user_agent: string;
+  masked_client_id: string;
+}
+
+export interface GmailPlatformStatus {
+  connected: boolean;
+  imap_host: string;
+  imap_port: number;
+  masked_user: string;
+}
+
+export interface ThreadsPlatformStatus {
+  connected: boolean;
+  masked_token: string;
+}
+
+export interface PlatformConnections {
+  x: XPlatformStatus;
+  reddit: RedditPlatformStatus;
+  gmail: GmailPlatformStatus;
+  threads: ThreadsPlatformStatus;
+}
+
 // ── Compliance / Audit ──────────────────────────────────────
 export interface AuditEvent {
   id: string;
@@ -337,3 +374,97 @@ export interface CampaignTrigger {
   profile_id?: string | null;
   created_at: string;
 }
+
+// ── Private Resolution Thread ────────────────────────────────
+export type PrivateChannel = "email" | "whatsapp" | "chat";
+
+export interface TicketMessage {
+  id: string;
+  ticket_id: string;
+  sender_role: "agent" | "customer" | "system";
+  sender_name: string;
+  content: string;
+  is_internal: boolean;
+  created_at: string;
+}
+
+export interface ThreadState {
+  ticket_id: string;
+  private_channel: PrivateChannel | null;
+  private_channel_address: string | null;
+  handoff_at: string | null;
+  messages: TicketMessage[];
+}
+
+export interface CustomerThreadState {
+  ticket_id: string;
+  status: string;
+  channel: PrivateChannel | null;
+  complaint_summary: string;
+  customer_name: string;
+  resolved: boolean;
+  resolution_note: string | null;
+  csat_collected: boolean;
+  messages: TicketMessage[];
+}
+
+// ── Analytics Intelligence ───────────────────────────────────
+export interface CategoryData {
+  name: string;
+  count: number;
+  prev_count: number;
+  change_pct: number;
+  avg_sentiment: number;
+}
+
+export interface ResolutionTimeData {
+  overall_avg_hours: number;
+  total_resolved: number;
+  by_category: Array<{ name: string; avg_hours: number; count: number }>;
+  by_channel: Array<{ name: string; avg_hours: number; count: number }>;
+  by_priority: Record<string, number>;
+  period: string;
+}
+
+export interface CSATTrendPoint {
+  date: string;
+  avg_score: number | null;
+  count: number;
+}
+
+export interface CSATTrend {
+  timeseries: CSATTrendPoint[];
+  overall_avg: number | null;
+  total_responses: number;
+  response_rate_pct: number;
+  period: string;
+}
+
+export interface SLAPriority {
+  compliant: number;
+  breached: number;
+  open: number;
+  compliance_pct: number;
+}
+
+export interface SLACompliance {
+  by_priority: Record<string, SLAPriority>;
+  period: string;
+}
+
+export interface AgentPerformance {
+  agent_id: string;
+  name: string;
+  tickets: number;
+  avg_resolution_hours: number;
+  avg_csat: number | null;
+  escalations: number;
+}
+
+export interface AIRecommendation {
+  title: string;
+  detail: string;
+  impact: "high" | "medium" | "low";
+  category: string;
+}
+

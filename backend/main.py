@@ -17,7 +17,7 @@ from models import Ticket, User
 from routers import ai as ai_router
 from routers import (
     analytics, auth, compliance, ingestion, integrations, knowledge,
-    profiles, settings as settings_router, social_monitor,
+    profiles, resolution, settings as settings_router, social_monitor,
     subscriptions, team, tenants, tickets, voice,
 )
 from security import decode_token
@@ -80,6 +80,7 @@ app.include_router(settings_router.router, prefix="/api/v1", tags=["Settings"])
 app.include_router(voice.router, prefix="/api/v1", tags=["Voice"])
 app.include_router(compliance.router, prefix="/api/v1", tags=["Compliance"])
 app.include_router(social_monitor.router, prefix="/api/v1", tags=["Social Monitor"])
+app.include_router(resolution.router, prefix="/api/v1", tags=["Resolution"])
 
 
 @app.get("/health")

@@ -81,6 +81,26 @@ class TenantConfig(Base):
     # Brand voice
     brand_tone: Mapped[str | None] = mapped_column(Text)  # markdown brand guidelines
     brand_examples: Mapped[list[dict]] = mapped_column(JSON, default=list, nullable=False)
+    # ── Platform Connections (user-configurable, encrypted) ───
+    # X / Twitter
+    x_bearer_token_enc: Mapped[str | None] = mapped_column(Text)
+    x_api_key_enc: Mapped[str | None] = mapped_column(Text)
+    x_api_secret_enc: Mapped[str | None] = mapped_column(Text)
+    x_access_token_enc: Mapped[str | None] = mapped_column(Text)
+    x_access_secret_enc: Mapped[str | None] = mapped_column(Text)
+    # Reddit
+    reddit_client_id_enc: Mapped[str | None] = mapped_column(Text)
+    reddit_client_secret_enc: Mapped[str | None] = mapped_column(Text)
+    reddit_user_agent: Mapped[str | None] = mapped_column(String(512))
+    reddit_username_enc: Mapped[str | None] = mapped_column(Text)
+    reddit_password_enc: Mapped[str | None] = mapped_column(Text)
+    # Gmail / IMAP
+    gmail_imap_host: Mapped[str | None] = mapped_column(String(512))
+    gmail_imap_port: Mapped[int | None] = mapped_column(Integer)
+    gmail_imap_user_enc: Mapped[str | None] = mapped_column(Text)
+    gmail_imap_pass_enc: Mapped[str | None] = mapped_column(Text)
+    # Threads
+    threads_access_token_enc: Mapped[str | None] = mapped_column(Text)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False)
 
     tenant: Mapped[Tenant] = relationship(back_populates="config")
@@ -202,9 +222,15 @@ class Ticket(Base):
     assigned_to: Mapped[str | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     resolution_note: Mapped[str | None] = mapped_column(Text)
+    resolved_by: Mapped[str | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     csat_score: Mapped[int | None] = mapped_column(Integer)  # 1-5
     csat_comment: Mapped[str | None] = mapped_column(Text)
     csat_collected_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Private channel resolution
+    private_channel: Mapped[str | None] = mapped_column(String(32))  # "email" | "whatsapp" | "chat"
+    private_channel_token: Mapped[str | None] = mapped_column(String(256), unique=True, index=True)
+    private_channel_address: Mapped[str | None] = mapped_column(String(512))  # email or phone
+    handoff_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     # Call recording reference
     call_recording_id: Mapped[str | None] = mapped_column(String(64))
     # Language
@@ -403,3 +429,20 @@ class SocialMention(Base):
     # Metadata
     raw_metadata: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
     captured_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True, nullable=False)
+
+
+# ── Ticket Message (private resolution thread) ──────────────────
+class TicketMessage(Base):
+    """Private threaded messages between agent and customer for a single ticket."""
+    __tablename__ = "ticket_messages"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True, default=lambda: new_id("msg"))
+    ticket_id: Mapped[str] = mapped_column(ForeignKey("tickets.id", ondelete="CASCADE"), index=True, nullable=False)
+    tenant_id: Mapped[str] = mapped_column(String(64), index=True, nullable=False)
+    # sender_role: "agent" | "customer" | "system"
+    sender_role: Mapped[str] = mapped_column(String(16), nullable=False)
+    sender_name: Mapped[str] = mapped_column(String(255), default="Unknown", nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    # is_internal: True = only agents see it (internal note)
+    is_internal: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True, nullable=False)

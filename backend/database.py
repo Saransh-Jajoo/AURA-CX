@@ -38,6 +38,59 @@ async def set_tenant_context(session: AsyncSession, tenant_id: str) -> None:
 async def init_db() -> None:
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        # Incremental column migrations — safe to re-run (IF NOT EXISTS)
+        _platform_columns = [
+            ("x_bearer_token_enc", "TEXT"),
+            ("x_api_key_enc", "TEXT"),
+            ("x_api_secret_enc", "TEXT"),
+            ("x_access_token_enc", "TEXT"),
+            ("x_access_secret_enc", "TEXT"),
+            ("reddit_client_id_enc", "TEXT"),
+            ("reddit_client_secret_enc", "TEXT"),
+            ("reddit_user_agent", "VARCHAR(512)"),
+            ("reddit_username_enc", "TEXT"),
+            ("reddit_password_enc", "TEXT"),
+            ("gmail_imap_host", "VARCHAR(512)"),
+            ("gmail_imap_port", "INTEGER"),
+            ("gmail_imap_user_enc", "TEXT"),
+            ("gmail_imap_pass_enc", "TEXT"),
+            ("threads_access_token_enc", "TEXT"),
+        ]
+        from sqlalchemy import text as _sql_text
+        for col_name, col_type in _platform_columns:
+            try:
+                await conn.execute(
+                    _sql_text(f"ALTER TABLE tenant_configs ADD COLUMN IF NOT EXISTS {col_name} {col_type}")
+                )
+            except Exception:  # noqa: BLE001
+                pass  # column already exists or table doesn't exist yet
+
+        # Ticket: private channel resolution fields
+        _ticket_columns = [
+            ("resolved_by", "VARCHAR(64)"),
+            ("private_channel", "VARCHAR(32)"),
+            ("private_channel_token", "VARCHAR(256)"),
+            ("private_channel_address", "VARCHAR(512)"),
+            ("handoff_at", "TIMESTAMPTZ"),
+        ]
+        for col_name, col_type in _ticket_columns:
+            try:
+                await conn.execute(
+                    _sql_text(f"ALTER TABLE tickets ADD COLUMN IF NOT EXISTS {col_name} {col_type}")
+                )
+            except Exception:  # noqa: BLE001
+                pass
+
+        # Unique index on private_channel_token for fast lookup
+        try:
+            await conn.execute(
+                _sql_text(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS ix_tickets_private_channel_token "
+                    "ON tickets(private_channel_token) WHERE private_channel_token IS NOT NULL"
+                )
+            )
+        except Exception:  # noqa: BLE001
+            pass
 
     async with SessionLocal() as session:
         tenant = await session.get(Tenant, settings.BOOTSTRAP_TENANT_ID)

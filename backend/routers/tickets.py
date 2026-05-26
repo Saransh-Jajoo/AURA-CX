@@ -157,6 +157,9 @@ async def approve_ticket(
 ):
     ticket = await _get_scoped_ticket(session, user, ticket_id)
     ticket.status = "resolved"
+    # FIX: actually record when the ticket was resolved (was missing before)
+    ticket.resolved_at = datetime.now(timezone.utc)
+    ticket.resolved_by = user.id
     if ticket.ai_draft:
         session.add(
             RLHFSignal(
@@ -183,6 +186,9 @@ async def edit_ticket(
     original = body.original_draft or ticket.ai_draft or ""
     ticket.ai_draft = body.edited_draft
     ticket.status = "resolved"
+    # FIX: actually record resolution time
+    ticket.resolved_at = datetime.now(timezone.utc)
+    ticket.resolved_by = user.id
     session.add(
         RLHFSignal(
             tenant_id=ticket.tenant_id,

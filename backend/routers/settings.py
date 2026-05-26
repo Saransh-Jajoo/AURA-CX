@@ -1,4 +1,4 @@
-"""Tenant settings and BYOI (Bring Your Own Infrastructure) management."""
+"""Tenant settings, BYOI, and platform connection management."""
 
 from __future__ import annotations
 
@@ -48,6 +48,29 @@ class TenantSettingsUpdate(BaseModel):
     sla_config: dict | None = None
 
 
+class PlatformConnectionUpdate(BaseModel):
+    """User-facing platform credential update. Empty strings clear the value."""
+    # X / Twitter
+    x_bearer_token: str | None = None
+    x_api_key: str | None = None
+    x_api_secret: str | None = None
+    x_access_token: str | None = None
+    x_access_secret: str | None = None
+    # Reddit
+    reddit_client_id: str | None = None
+    reddit_client_secret: str | None = None
+    reddit_user_agent: str | None = None
+    reddit_username: str | None = None
+    reddit_password: str | None = None
+    # Gmail / IMAP
+    gmail_imap_host: str | None = Field(default=None, max_length=512)
+    gmail_imap_port: int | None = None
+    gmail_imap_user: str | None = None
+    gmail_imap_pass: str | None = None
+    # Threads
+    threads_access_token: str | None = None
+
+
 def _mask_credential(value: str | None) -> str:
     """Mask a credential for safe display."""
     if not value:
@@ -77,6 +100,44 @@ def _config_status(config: TenantConfig | None) -> dict:
     }
 
 
+def _platform_status(config: TenantConfig | None) -> dict:
+    """Return platform connection status without exposing secrets."""
+    if config is None:
+        return {
+            "x": {"connected": False},
+            "reddit": {"connected": False},
+            "gmail": {"connected": False},
+            "threads": {"connected": False},
+        }
+    return {
+        "x": {
+            "connected": bool(config.x_bearer_token_enc),
+            "has_bearer_token": bool(config.x_bearer_token_enc),
+            "has_oauth": bool(config.x_api_key_enc and config.x_api_secret_enc),
+            "has_user_tokens": bool(config.x_access_token_enc and config.x_access_secret_enc),
+            "masked_bearer": _mask_credential(decrypt_value(config.x_bearer_token_enc or "")),
+            "masked_api_key": _mask_credential(decrypt_value(config.x_api_key_enc or "")),
+        },
+        "reddit": {
+            "connected": bool(config.reddit_client_id_enc and config.reddit_client_secret_enc),
+            "has_client_creds": bool(config.reddit_client_id_enc and config.reddit_client_secret_enc),
+            "has_account": bool(config.reddit_username_enc),
+            "user_agent": config.reddit_user_agent or "",
+            "masked_client_id": _mask_credential(decrypt_value(config.reddit_client_id_enc or "")),
+        },
+        "gmail": {
+            "connected": bool(config.gmail_imap_host and config.gmail_imap_user_enc),
+            "imap_host": config.gmail_imap_host or "imap.gmail.com",
+            "imap_port": config.gmail_imap_port or 993,
+            "masked_user": _mask_credential(decrypt_value(config.gmail_imap_user_enc or "")),
+        },
+        "threads": {
+            "connected": bool(config.threads_access_token_enc),
+            "masked_token": _mask_credential(decrypt_value(config.threads_access_token_enc or "")),
+        },
+    }
+
+
 @router.get("/settings")
 async def get_tenant_settings(
     user: Annotated[User, Depends(require_roles("tenant_admin"))],
@@ -102,6 +163,7 @@ async def get_tenant_settings(
             "created_at": tenant.created_at.isoformat(),
         },
         "byoi": _config_status(tenant.config),
+        "platforms": _platform_status(tenant.config),
     }
 
 
@@ -224,3 +286,94 @@ async def update_byoi_config(
 
     await session.commit()
     return {"status": "updated", "byoi": _config_status(config), "changed_services": changed_services}
+
+
+@router.get("/settings/platforms")
+async def get_platform_connections(
+    user: Annotated[User, Depends(require_roles("tenant_admin"))],
+    session: Annotated[AsyncSession, Depends(get_session)],
+):
+    """Get platform connection status (masked credentials only)."""
+    tenant_id = assert_tenant(user, None)
+    tenant = await session.get(Tenant, tenant_id)
+    if tenant is None:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+    return {"platforms": _platform_status(tenant.config)}
+
+
+@router.put("/settings/platforms")
+async def update_platform_connections(
+    body: PlatformConnectionUpdate,
+    user: Annotated[User, Depends(require_roles("tenant_admin"))],
+    session: Annotated[AsyncSession, Depends(get_session)],
+):
+    """Update platform connection credentials (encrypted at rest)."""
+    tenant_id = assert_tenant(user, None)
+    tenant = await session.get(Tenant, tenant_id)
+    if tenant is None:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+
+    config = tenant.config
+    if config is None:
+        config = TenantConfig(tenant_id=tenant_id)
+        session.add(config)
+
+    changed_platforms = []
+
+    # X / Twitter
+    if body.x_bearer_token is not None:
+        config.x_bearer_token_enc = encrypt_value(body.x_bearer_token) if body.x_bearer_token else None
+        changed_platforms.append("x")
+    if body.x_api_key is not None:
+        config.x_api_key_enc = encrypt_value(body.x_api_key) if body.x_api_key else None
+    if body.x_api_secret is not None:
+        config.x_api_secret_enc = encrypt_value(body.x_api_secret) if body.x_api_secret else None
+    if body.x_access_token is not None:
+        config.x_access_token_enc = encrypt_value(body.x_access_token) if body.x_access_token else None
+    if body.x_access_secret is not None:
+        config.x_access_secret_enc = encrypt_value(body.x_access_secret) if body.x_access_secret else None
+
+    # Reddit
+    if body.reddit_client_id is not None:
+        config.reddit_client_id_enc = encrypt_value(body.reddit_client_id) if body.reddit_client_id else None
+        changed_platforms.append("reddit")
+    if body.reddit_client_secret is not None:
+        config.reddit_client_secret_enc = encrypt_value(body.reddit_client_secret) if body.reddit_client_secret else None
+    if body.reddit_user_agent is not None:
+        config.reddit_user_agent = body.reddit_user_agent or None
+    if body.reddit_username is not None:
+        config.reddit_username_enc = encrypt_value(body.reddit_username) if body.reddit_username else None
+    if body.reddit_password is not None:
+        config.reddit_password_enc = encrypt_value(body.reddit_password) if body.reddit_password else None
+
+    # Gmail / IMAP
+    if body.gmail_imap_host is not None:
+        config.gmail_imap_host = body.gmail_imap_host or None
+    if body.gmail_imap_port is not None:
+        config.gmail_imap_port = body.gmail_imap_port
+    if body.gmail_imap_user is not None:
+        config.gmail_imap_user_enc = encrypt_value(body.gmail_imap_user) if body.gmail_imap_user else None
+        changed_platforms.append("gmail")
+    if body.gmail_imap_pass is not None:
+        config.gmail_imap_pass_enc = encrypt_value(body.gmail_imap_pass) if body.gmail_imap_pass else None
+
+    # Threads
+    if body.threads_access_token is not None:
+        config.threads_access_token_enc = encrypt_value(body.threads_access_token) if body.threads_access_token else None
+        changed_platforms.append("threads")
+
+    session.add(AuditEvent(
+        tenant_id=tenant_id,
+        user_id=user.id,
+        action="platforms.update",
+        resource_type="tenant_config",
+        resource_id=config.id,
+        details={"changed_platforms": changed_platforms},
+    ))
+
+    await session.commit()
+    return {
+        "status": "updated",
+        "platforms": _platform_status(config),
+        "changed_platforms": changed_platforms,
+    }

@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import {
   fetchHITLQueue, approveTicket, escalateTicket,
   editTicketWithRLHF, sendRLHFSignal, fetchProfile,
-  generateAIDraft, createHandoffLink,
+  generateAIDraft, handoffToPrivateChannel,
 } from "@/lib/api";
 import type { HITLItem, GoldenProfile } from "@/lib/types";
 import { GoldenProfileStitching } from "@/components/golden-profile-stitching";
@@ -14,7 +14,7 @@ import { SentimentGauge } from "@/components/sentiment-gauge";
 import {
   CheckCircle, XCircle, Edit3, Send, AlertTriangle, BookOpen,
   Zap, ChevronRight, Sparkles, RotateCcw, MoreHorizontal, Copy, Trash2,
-  MessageCircle, Bot, Loader2,
+  MessageCircle, Loader2, Lock, Mail, X,
 } from "lucide-react";
 import { ChannelBadge } from "@/components/channel-icons";
 
@@ -42,6 +42,161 @@ function ConfidenceRing({ value, size = 40 }: { value: number; size?: number }) 
   );
 }
 
+/* ── Private Channel Handoff Modal ────────────────────────── */
+function PrivateChannelHandoff({ ticketId, customerName }: { ticketId: string; customerName: string }) {
+  const [open, setOpen] = React.useState(false);
+  const [channel, setChannel] = React.useState<"email" | "whatsapp">("email");
+  const [address, setAddress] = React.useState("");
+  const [introMessage, setIntroMessage] = React.useState(
+    `Hi ${customerName}, we've received your complaint and are looking into it. For your privacy, we'll continue this conversation securely via this private link.`
+  );
+  const [loading, setLoading] = React.useState(false);
+  const [success, setSuccess] = React.useState<string | null>(null);
+
+  const handleSend = async () => {
+    if (!address.trim()) return;
+    setLoading(true);
+    try {
+      const res = await handoffToPrivateChannel(ticketId, {
+        channel,
+        address: address.trim(),
+        customer_name: customerName,
+        intro_message: introMessage,
+      });
+      setSuccess(res.chat_url);
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : "Failed to send");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <>
+      <button
+        onClick={() => setOpen(true)}
+        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-[var(--radius-md)] text-xs font-semibold border border-[var(--accent-primary)]/30 text-[var(--accent-primary)] bg-[var(--accent-primary)]/8 hover:bg-[var(--accent-primary)]/15 transition-all"
+      >
+        <Lock className="w-3.5 h-3.5" />
+        Move to Private Channel
+      </button>
+
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+            onClick={(e) => e.target === e.currentTarget && setOpen(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, y: 8 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 8 }}
+              className="bg-[var(--bg-card)] border border-[var(--border-subtle)] rounded-[var(--radius-lg)] p-6 w-full max-w-md shadow-2xl"
+            >
+              {success ? (
+                <div className="text-center py-4">
+                  <div className="w-12 h-12 rounded-full bg-[var(--accent-emerald)]/20 flex items-center justify-center mx-auto mb-4">
+                    <Lock className="w-6 h-6 text-[var(--accent-emerald)]" />
+                  </div>
+                  <h3 className="font-semibold text-lg mb-2">Customer Notified ✅</h3>
+                  <p className="text-sm text-[var(--text-muted)] mb-4">
+                    {channel === "email" ? "Email sent" : "WhatsApp sent"} to {address}
+                  </p>
+                  <p className="text-xs text-[var(--text-muted)] bg-[var(--bg-inset)] rounded-lg p-2 font-mono break-all">
+                    {success}
+                  </p>
+                  <button
+                    onClick={() => { setOpen(false); setSuccess(null); }}
+                    className="mt-4 w-full py-2 rounded-[var(--radius-md)] bg-[var(--accent-primary)]/20 text-[var(--accent-primary)] text-sm font-semibold"
+                  >
+                    Done
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between mb-5">
+                    <div className="flex items-center gap-2">
+                      <Lock className="w-5 h-5 text-[var(--accent-primary)]" />
+                      <h3 className="font-semibold text-base">Move to Private Channel</h3>
+                    </div>
+                    <button onClick={() => setOpen(false)} className="text-[var(--text-muted)] hover:text-[var(--text-primary)]">
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <p className="text-xs text-[var(--text-muted)] mb-4">
+                    Resolution will continue privately — not on public social media. The customer will receive a secure link.
+                  </p>
+
+                  {/* Channel selector */}
+                  <div className="grid grid-cols-2 gap-2 mb-4">
+                    {(["email", "whatsapp"] as const).map((ch) => (
+                      <button
+                        key={ch}
+                        onClick={() => setChannel(ch)}
+                        className={cn(
+                          "flex items-center gap-2 px-4 py-2.5 rounded-[var(--radius-md)] border text-sm font-medium transition-all",
+                          channel === ch
+                            ? "border-[var(--accent-primary)] bg-[var(--accent-primary)]/10 text-[var(--accent-primary)]"
+                            : "border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                        )}
+                      >
+                        {ch === "email" ? <Mail className="w-4 h-4" /> : <MessageCircle className="w-4 h-4" />}
+                        {ch === "email" ? "Email" : "WhatsApp"}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Address input */}
+                  <label className="text-xs font-semibold text-[var(--text-muted)] mb-1 block">
+                    {channel === "email" ? "Customer email address" : "Customer phone (+1234567890)"}
+                  </label>
+                  <input
+                    type={channel === "email" ? "email" : "tel"}
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                    placeholder={channel === "email" ? "customer@example.com" : "+1 555 123 4567"}
+                    className="w-full bg-[var(--bg-inset)] border border-[var(--border-subtle)] rounded-[var(--radius-md)] px-3 py-2 text-sm mb-3 focus:outline-none focus:border-[var(--accent-primary)] transition-colors"
+                  />
+
+                  {/* Opening message */}
+                  <label className="text-xs font-semibold text-[var(--text-muted)] mb-1 block">Opening message to customer</label>
+                  <textarea
+                    value={introMessage}
+                    onChange={(e) => setIntroMessage(e.target.value)}
+                    rows={3}
+                    className="w-full bg-[var(--bg-inset)] border border-[var(--border-subtle)] rounded-[var(--radius-md)] px-3 py-2 text-sm resize-none mb-4 focus:outline-none focus:border-[var(--accent-primary)] transition-colors"
+                  />
+
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => setOpen(false)}
+                      className="flex-1 py-2 rounded-[var(--radius-md)] border border-[var(--border-subtle)] text-sm text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleSend}
+                      disabled={loading || !address.trim()}
+                      className="flex-1 py-2 rounded-[var(--radius-md)] bg-[var(--accent-primary)] text-white text-sm font-semibold disabled:opacity-40 transition-all flex items-center justify-center gap-2"
+                    >
+                      {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Lock className="w-4 h-4" />}
+                      Send &amp; Move →
+                    </button>
+                  </div>
+                </>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
+  );
+}
+
+/* ── HITL Main Page ───────────────────────────────────────── */
 export default function HITLPage() {
   const [queue, setQueue] = useState<HITLItem[]>([]);
   const [selected, setSelected] = useState(0);
@@ -59,7 +214,6 @@ export default function HITLPage() {
 
   const item = queue[selected];
 
-  // Load profile when item changes
   useEffect(() => {
     if (!item) return;
     setProfile(null);
@@ -73,6 +227,8 @@ export default function HITLPage() {
       })
         .then((draft) => setEditDraft(draft.draft))
         .catch(() => setEditDraft(""));
+    } else {
+      setEditDraft(item.ai_draft);
     }
   }, [item]);
 
@@ -107,10 +263,8 @@ export default function HITLPage() {
       setQueue((prev) => prev.filter((_, i) => i !== selected));
       setSelected(0);
       setEditing(false);
-      if (queue.length > 1) {
-        const nextItem = queue.filter((_, i) => i !== selected)[0];
-        if (nextItem) setEditDraft(nextItem.ai_draft);
-      }
+      const remaining = queue.filter((_, i) => i !== selected);
+      if (remaining.length) setEditDraft(remaining[0].ai_draft);
     } finally {
       setActionLoading(null);
     }
@@ -149,7 +303,7 @@ export default function HITLPage() {
       </div>
 
       <div className="grid grid-cols-12 gap-5">
-        {/* ── Queue List ─────────────────────────────────── */}
+        {/* ── Queue List ──────────────────────────────────── */}
         <div className="col-span-4 glass-card overflow-hidden">
           <div className="px-4 py-3 border-b border-[var(--border-subtle)] flex items-center justify-between">
             <h3 className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">
@@ -200,7 +354,7 @@ export default function HITLPage() {
           </div>
         </div>
 
-        {/* ── Review Panel ───────────────────────────────── */}
+        {/* ── Review Panel ────────────────────────────────── */}
         <div className="col-span-8 space-y-5">
           <AnimatePresence mode="wait">
             {item && (
@@ -214,7 +368,6 @@ export default function HITLPage() {
               >
                 {/* ── Identity & Analytics + Sentiment Velocity ── */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                  {/* Golden Profile Stitching */}
                   <div className="glass-card p-5">
                     <h3 className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-4">
                       Identity & Analytics
@@ -222,7 +375,6 @@ export default function HITLPage() {
                     {profile ? <GoldenProfileStitching profile={profile} /> : <p className="text-sm text-[var(--text-muted)]">No verified identity match yet.</p>}
                   </div>
 
-                  {/* Sentiment Velocity Gauge */}
                   <div className="glass-card p-5">
                     <h3 className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-3">
                       Sentiment Velocity (V_sent)
@@ -235,7 +387,7 @@ export default function HITLPage() {
                   </div>
                 </div>
 
-                {/* ── HITL Orchestration ──────────────────── */}
+                {/* ── HITL Orchestration ────────────────────── */}
                 <div className="space-y-4">
                   <h3 className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">
                     Human-in-the-Loop (HITL) Orchestration
@@ -279,11 +431,8 @@ export default function HITLPage() {
                           className="w-full h-44 p-4 rounded-[var(--radius-md)] bg-[var(--bg-primary)] border border-[var(--border-subtle)] text-sm text-[var(--text-primary)] resize-none focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]/20 transition-all"
                         />
                       ) : (
-                        <div className="space-y-3 text-sm leading-relaxed">
-                          <p>Dear Customer response,</p>
-                          <p><strong>Problem Acknowledgment:</strong><br />{editDraft || item.ai_draft || "Draft pending from /api/v1/ai/draft."}</p>
-                          <p><strong>Resolution Steps:</strong><br />1. Enter the steps, look at for the best services and resolution strategies.</p>
-                          <p><strong>Follow-up:</strong> We will take your e-mail customer services and resolve with our resolution.</p>
+                        <div className="space-y-3 text-sm leading-relaxed text-[var(--text-primary)] whitespace-pre-wrap">
+                          {editDraft || item.ai_draft || "Draft pending from /api/v1/ai/draft."}
                         </div>
                       )}
 
@@ -308,7 +457,7 @@ export default function HITLPage() {
                     </div>
                   </div>
 
-                  {/* ── HITL Action Buttons ────────────────── */}
+                  {/* ── HITL Action Buttons ──────────────────── */}
                   <div className="flex items-center gap-3">
                     <button
                       onClick={() => handleAction("approve")}
@@ -337,37 +486,19 @@ export default function HITLPage() {
                         MANUAL EDIT
                       </button>
                     )}
+
+                    <button
+                      onClick={() => handleAction("escalate")}
+                      disabled={actionLoading !== null}
+                      className="hitl-btn-escalate flex items-center justify-center gap-2"
+                    >
+                      <AlertTriangle className="w-4 h-4" />
+                      {actionLoading === "escalate" ? "…" : "Escalate"}
+                    </button>
                   </div>
 
-                  {/* ── Handoff Actions ─────────────────── */}
-                  <div className="flex items-center gap-3">
-                    <button
-                      onClick={async () => {
-                        const waLink = (await createHandoffLink(item.id, "whatsapp")).deep_link;
-                        setEditDraft(
-                          editDraft + `\n\n---\n📱 Continue on WhatsApp for guided support: ${waLink}`
-                        );
-                        setEditing(true);
-                      }}
-                      className="hitl-btn-handoff-wa flex items-center justify-center gap-2 flex-1"
-                    >
-                      <MessageCircle className="w-4 h-4" />
-                      Handoff to WhatsApp
-                    </button>
-                    <button
-                      onClick={async () => {
-                        const chatToken = (await createHandoffLink(item.id, "chatbot")).deep_link.replace(/^.*\/chat\//, "");
-                        setEditDraft(
-                          editDraft + `\n\n---\n🤖 Continue with our AI assistant for step-by-step help: ${window.location.origin}/chat/${chatToken}`
-                        );
-                        setEditing(true);
-                      }}
-                      className="hitl-btn-handoff-bot flex items-center justify-center gap-2 flex-1"
-                    >
-                      <Bot className="w-4 h-4" />
-                      Handoff to AI Chatbot
-                    </button>
-                  </div>
+                  {/* ── Move to Private Channel ─────────────── */}
+                  <PrivateChannelHandoff ticketId={item.id} customerName={item.customer_name} />
                 </div>
               </motion.div>
             )}
