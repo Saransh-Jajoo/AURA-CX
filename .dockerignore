@@ -1,8 +1,26 @@
-.git
-.venv
-**/__pycache__
-**/.next
-**/node_modules
-*.log
-frontend/tsc_errors.txt
+# Dependencies & virtual environments
+venv/
+**/venv/
+.venv/
 
+# Build artifacts
+__pycache__/
+*.pyc
+node_modules/
+.next/
+
+# Environment secrets
+.env
+.env.local
+.env.production
+
+# Certificates
+certs/
+
+# Logs
+*.log
+*.err.log
+
+# Git
+.git/
+.github/

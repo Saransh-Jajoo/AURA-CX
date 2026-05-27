@@ -6,10 +6,7 @@ and if so, extracts category, severity, and summary.
 
 from __future__ import annotations
 
-import json
 import logging
-import re
-from typing import Any
 
 import httpx
 
@@ -22,16 +19,7 @@ class ClassificationError(RuntimeError):
     pass
 
 
-def _extract_json(text: str) -> dict[str, Any]:
-    text = text.strip()
-    if text.startswith("```"):
-        text = re.sub(r"^```(?:json)?", "", text).strip()
-        text = re.sub(r"```$", "", text).strip()
-    start = text.find("{")
-    end = text.rfind("}")
-    if start >= 0 and end > start:
-        text = text[start : end + 1]
-    return json.loads(text)
+from services.ai_service import _extract_json
 
 
 async def classify_mention(content: str, platform: str, author_handle: str = "") -> dict:

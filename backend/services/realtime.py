@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import WebSocket
 
@@ -20,7 +20,7 @@ class ConnectionManager:
         self._connections[tenant_id].discard(websocket)
 
     async def broadcast(self, tenant_id: str, event: dict) -> None:
-        payload = {"tenant_id": tenant_id, "emitted_at": datetime.utcnow().isoformat() + "Z", **event}
+        payload = {"tenant_id": tenant_id, "emitted_at": datetime.now(timezone.utc).isoformat(), **event}
         stale: list[WebSocket] = []
         for connection in list(self._connections.get(tenant_id, set())):
             try:

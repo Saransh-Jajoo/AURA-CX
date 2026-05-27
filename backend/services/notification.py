@@ -63,9 +63,9 @@ async def _send_email(*, address: str, subject: str, text_body: str, html_body: 
 
 
 async def _send_whatsapp(*, phone: str, body: str) -> bool:
-    twilio_sid = settings.TWILIO_ACCOUNT_SID if hasattr(settings, "TWILIO_ACCOUNT_SID") else None
-    twilio_token = settings.TWILIO_AUTH_TOKEN if hasattr(settings, "TWILIO_AUTH_TOKEN") else None
-    twilio_phone = settings.TWILIO_PHONE_NUMBER if hasattr(settings, "TWILIO_PHONE_NUMBER") else None
+    twilio_sid = settings.TWILIO_ACCOUNT_SID or None
+    twilio_token = settings.TWILIO_AUTH_TOKEN or None
+    twilio_phone = settings.TWILIO_PHONE_NUMBER or None
 
     if not twilio_sid or not twilio_token or not twilio_phone:
         logger.warning("Twilio not configured — skipping WhatsApp to %s", phone)

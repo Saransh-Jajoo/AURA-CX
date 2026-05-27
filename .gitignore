@@ -1,10 +1,39 @@
-*.log
+# Dependencies
+node_modules/
+.venv/
+venv/
+
+# Build output
 __pycache__/
 *.pyc
-node_modules/
 .next/
+
+# Environment secrets
 .env
 .env.local
 .env.production
-.venv/
+.env.*.local
+backend/.env
+
+# Certificates / TLS
+certs/
 *.pem
+
+# Logs
+*.log
+*.err.log
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# Docker
+docker_desktop_start.log
+
+# IDE
+.idea/
+.vscode/
+*.code-workspace

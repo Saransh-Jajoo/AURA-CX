@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
 import redis
 
@@ -15,7 +14,7 @@ logger = logging.getLogger(__name__)
 class DeduplicationService:
     """Prevents duplicate message processing using Redis with SET NX (set if not exists)."""
 
-    def __init__(self, redis_client: Optional[redis.Redis] = None):
+    def __init__(self, redis_client: redis.Redis | None = None):
         """
         Initialize deduplication service.
 
@@ -126,7 +125,7 @@ class DeduplicationService:
 
 
 # Global singleton instance
-_dedup_service: Optional[DeduplicationService] = None
+_dedup_service: DeduplicationService | None = None
 
 
 def get_dedup_service() -> DeduplicationService:

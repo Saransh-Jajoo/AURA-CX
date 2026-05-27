@@ -59,15 +59,13 @@ def scan_sla_breaches():
     """Periodic scan for SLA breaches and escalation triggers."""
     import asyncio
     from database import SessionLocal
-    from services.sla_engine import SLAEngine
+    from services.sla_engine import sla_status
 
     async def _scan():
         async with SessionLocal() as db:
             from sqlalchemy import select, and_
             from models import Ticket
-            from datetime import datetime, timezone
 
-            engine = SLAEngine()
             stmt = select(Ticket).where(
                 and_(
                     Ticket.status.in_(["new", "in_progress", "awaiting_reply"]),
@@ -79,10 +77,9 @@ def scan_sla_breaches():
 
             breached = []
             for ticket in active_tickets:
-                status = engine.check_status(ticket)
+                status = sla_status(ticket)
                 if status["breached"] and not ticket.sla_breached:
                     ticket.sla_breached = True
-                    ticket.sla_breach_at = datetime.now(timezone.utc)
                     breached.append(ticket.id)
 
             if breached:
