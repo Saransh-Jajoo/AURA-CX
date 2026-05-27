@@ -1,0 +1,16 @@
+# Ignore virtual environment
+venv/
+.venv/
+env/
+.env
+
+# Python build artifacts
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Logs and databases
+*.log
+*.sqlite3
+*.db

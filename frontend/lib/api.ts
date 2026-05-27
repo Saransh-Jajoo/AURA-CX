@@ -120,8 +120,10 @@ export async function fetchShadowTickets(): Promise<{ shadow_tickets: ShadowTick
   return request("/api/v1/analytics/shadow-tickets");
 }
 
-export async function fetchTrends(): Promise<{ timeseries: TrendPoint[] }> {
-  return request("/api/v1/analytics/trends");
+export async function fetchTrends(
+  period: "24h" | "7d" | "30d" = "24h"
+): Promise<{ timeseries: TrendPoint[] }> {
+  return request(`/api/v1/analytics/trends?period=${period}`);
 }
 
 export async function fetchTenants(): Promise<{ tenants: Array<{ id: string; name: string; plan: string; agents: number; status: string }>; total: number }> {
