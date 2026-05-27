@@ -8,6 +8,7 @@ param(
 
 # Locate psql – check default install paths for PG 16/17
 $psqlPaths = @(
+    "D:\tools\sql\bin\psql.exe",
     "C:\Program Files\PostgreSQL\16\bin\psql.exe",
     "C:\Program Files\PostgreSQL\17\bin\psql.exe",
     "C:\Program Files\PostgreSQL\15\bin\psql.exe"

@@ -1,0 +1,13 @@
+node_modules
+.next
+out
+build
+*.log
+frontend-dev.log
+frontend-dev.err.log
+tsc_errors.txt
+tsc_out.log
+.gitignore
+README.md
+AGENTS.md
+CLAUDE.md

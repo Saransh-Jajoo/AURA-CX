@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Body, Depends, Header, HTTPException, Request
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,8 +15,9 @@ from config import settings
 from database import get_session
 from models import CustomerProfile, IntegrationSource, Ticket, User
 from routers.integrations import verify_webhook_source
-from security import assert_tenant, require_roles
+from security import assert_tenant, require_roles, verify_webhook_signature
 from services import ai_service
+from services.deduplication import get_dedup_service
 from services.realtime import manager, ticket_to_dict
 from services.scrubbing import scrub_text
 
@@ -196,26 +198,88 @@ async def process_webhook_payload(
 async def ingest_webhook(
     tenant_id: str,
     channel: str,
-    payload: WebhookPayload,
+    request: Request,
     session: Annotated[AsyncSession, Depends(get_session)],
-    x_aura_webhook_secret: Annotated[str | None, Header(alias="X-AURA-WEBHOOK-SECRET")] = None,
+    x_aura_webhook_signature: Annotated[str | None, Header(alias="X-Aura-Webhook-Signature")] = None,
 ):
+    """
+    Receive signed webhooks from external providers (X, Reddit, Gmail).
+    
+    Security: Requires HMAC-SHA256 signature verification on the raw request body.
+    The signature must be provided in the X-Aura-Webhook-Signature header.
+    
+    Deduplication: Uses Redis to detect and reject duplicate messages.
+    """
     channel = channel.lower()
     if channel not in ALLOWED_CHANNELS:
         raise HTTPException(status_code=400, detail="Unsupported channel")
-    secret = x_aura_webhook_secret
-    if settings.WEBHOOK_SIGNING_SECRET and secret == settings.WEBHOOK_SIGNING_SECRET:
-        sources = (
-            await session.scalars(
-                select(IntegrationSource).where(
-                    IntegrationSource.tenant_id == tenant_id,
-                    IntegrationSource.platform == channel,
-                    IntegrationSource.active.is_(True),
-                )
+    
+    # Get raw request body for HMAC verification
+    body = await request.body()
+    
+    # Verify webhook signature (HMAC-SHA256)
+    if not settings.WEBHOOK_SIGNING_SECRET:
+        raise HTTPException(
+            status_code=500,
+            detail="Webhook signing not configured on server",
+        )
+    
+    if not x_aura_webhook_signature:
+        raise HTTPException(
+            status_code=401,
+            detail="Missing X-Aura-Webhook-Signature header",
+        )
+    
+    try:
+        if not verify_webhook_signature(
+            settings.WEBHOOK_SIGNING_SECRET,
+            body,
+            x_aura_webhook_signature,
+        ):
+            raise HTTPException(
+                status_code=401,
+                detail="Invalid webhook signature",
             )
-        ).all()
-    else:
-        sources = await verify_webhook_source(session, tenant_id, channel, secret)
+    except ValueError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    
+    # Parse JSON payload after signature verification
+    try:
+        payload_dict = json.loads(body.decode("utf-8"))
+        payload = WebhookPayload(**payload_dict)
+    except (json.JSONDecodeError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=f"Invalid payload: {exc}") from exc
+    
+    # ── Deduplication Check ───────────────────────────────────────
+    dedup_service = get_dedup_service()
+    message_id = payload.external_id or payload.sender_id
+    is_new_message = dedup_service.check_and_mark_processed(
+        tenant_id=tenant_id,
+        platform=channel,
+        message_id=message_id,
+        ttl_seconds=86400,  # 24 hour dedup window
+    )
+    
+    if not is_new_message:
+        # Duplicate message detected — return success to avoid webhook retry loop
+        return {
+            "status": "duplicate_skipped",
+            "message_id": message_id,
+            "reason": "Message was already processed",
+        }
+    # ──────────────────────────────────────────────────────────────
+    
+    # Find matching sources for this tenant/channel
+    sources = (
+        await session.scalars(
+            select(IntegrationSource).where(
+                IntegrationSource.tenant_id == tenant_id,
+                IntegrationSource.platform == channel,
+                IntegrationSource.active.is_(True),
+            )
+        )
+    ).all()
+    
     ticket = await process_webhook_payload(
         session=session,
         tenant_id=tenant_id,

@@ -22,7 +22,9 @@ class Settings(BaseSettings):
 
     SECRET_KEY: str = ""
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 480
+    # JWT Token Configuration
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 15  # 15 min access tokens per fintech compliance
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 7  # 7-day refresh tokens
     BOOTSTRAP_TENANT_ID: str = "tenant-default"
     BOOTSTRAP_TENANT_NAME: str = "AURA-CX Workspace"
     BOOTSTRAP_ADMIN_EMAIL: str = ""
@@ -85,6 +87,18 @@ class Settings(BaseSettings):
     # ── Campaign Engine ──────────────────────────────────────
     SENTIMENT_DROP_THRESHOLD: float = -0.40
     CHURN_RISK_THRESHOLD: float = 0.65
+
+    # ── Audit & Compliance ───────────────────────────────────
+    AUDIT_LOG_RETENTION_DAYS: int = 1825  # 5 years per RBI guidelines
+    AUDIT_LOG_ENABLED: bool = True
+    LOG_API_CALLS: bool = True
+    LOG_DATA_ACCESS: bool = True
+    
+    # ── Rate Limiting ────────────────────────────────────────
+    ENABLE_RATE_LIMITING: bool = True
+    RATE_LIMIT_TENANT_PER_MINUTE: int = 500  # requests/min per tenant
+    RATE_LIMIT_IP_PER_MINUTE: int = 100  # requests/min per IP (unauthenticated)
+    RATE_LIMIT_WEBHOOK_PER_MINUTE: int = 20  # POST requests/min per webhook source
 
     @field_validator("VECTOR_PROVIDER")
     @classmethod

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import hmac
 from datetime import datetime, timedelta, timezone
 from typing import Annotated, Callable
 
@@ -134,4 +136,67 @@ def public_user(user: User) -> dict:
         "avatar": user.avatar,
         "role_info": ROLES[user.role],
     }
+
+
+# ── Webhook Security ──────────────────────────────────────────────────
+def verify_webhook_signature(secret: str, payload: bytes, signature: str) -> bool:
+    """
+    Verify webhook HMAC signature (SHA-256).
+    
+    Args:
+        secret: The webhook signing secret (from settings.WEBHOOK_SIGNING_SECRET)
+        payload: Raw request body bytes
+        signature: The X-Aura-Webhook-Signature header value (hex format)
+    
+    Returns:
+        True if signature is valid, False otherwise
+    
+    Security: Uses constant-time comparison to prevent timing attacks
+    """
+    if not secret:
+        raise ValueError("WEBHOOK_SIGNING_SECRET is not configured")
+    
+    expected = hmac.new(
+        secret.encode("utf-8"),
+        payload,
+        hashlib.sha256,
+    ).hexdigest()
+    
+    # Constant-time comparison prevents timing attacks
+    return hmac.compare_digest(expected, signature)
+
+
+async def verify_webhook_request(
+    request_body: bytes,
+    signature_header: str | None,
+) -> bool:
+    """
+    Dependency to verify webhook signature in FastAPI route.
+    
+    Raises HTTPException(401) if signature is invalid.
+    """
+    if not signature_header:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing X-Aura-Webhook-Signature header",
+        )
+    
+    try:
+        if not verify_webhook_signature(
+            settings.WEBHOOK_SIGNING_SECRET,
+            request_body,
+            signature_header,
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid webhook signature",
+            )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(exc),
+        ) from exc
+    
+    return True
+
 
