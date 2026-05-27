@@ -4,6 +4,10 @@ from __future__ import annotations
 
 import logging
 from typing import Any
+import json
+import math
+import os
+from pathlib import Path
 
 from config import settings
 
@@ -12,6 +16,48 @@ logger = logging.getLogger("aura_cx.vector")
 
 def tenant_namespace(tenant_id: str, bucket: str) -> str:
     return f"{tenant_id}:{bucket}"
+
+
+# Local file-backed persistence for development when external vector DBs are not available
+LOCAL_VECTOR_DIR = Path(__file__).resolve().parents[1] / ".vectors"
+LOCAL_VECTOR_DIR.mkdir(exist_ok=True)
+
+
+def _local_path(namespace: str) -> Path:
+    safe = namespace.replace("/", "_")
+    return LOCAL_VECTOR_DIR / f"{safe}.json"
+
+
+def _load_local(namespace: str) -> list[dict[str, Any]]:
+    p = _local_path(namespace)
+    if not p.exists():
+        return []
+    try:
+        with p.open("r", encoding="utf-8") as fh:
+            return json.load(fh)
+    except Exception:
+        logger.exception("Failed to load local vector file %s", p)
+        return []
+
+
+def _save_local(namespace: str, vectors: list[dict[str, Any]]) -> None:
+    p = _local_path(namespace)
+    try:
+        with p.open("w", encoding="utf-8") as fh:
+            json.dump(vectors, fh)
+    except Exception:
+        logger.exception("Failed to save local vector file %s", p)
+
+
+def _cosine_similarity(a: list[float], b: list[float]) -> float:
+    if not a or not b or len(a) != len(b):
+        return 0.0
+    dot = sum(x * y for x, y in zip(a, b))
+    na = math.sqrt(sum(x * x for x in a))
+    nb = math.sqrt(sum(y * y for y in b))
+    if na == 0 or nb == 0:
+        return 0.0
+    return dot / (na * nb)
 
 
 async def query_vectors(
@@ -26,7 +72,22 @@ async def query_vectors(
         return []
     if settings.VECTOR_PROVIDER == "pinecone":
         return await _query_pinecone(tenant_id, bucket, vector, top_k, include_values)
-    return await _query_chroma(tenant_id, bucket, vector, top_k)
+    if settings.VECTOR_PROVIDER == "chroma":
+        return await _query_chroma(tenant_id, bucket, vector, top_k)
+    # fallback to local file-backed persistence
+    namespace = tenant_namespace(tenant_id, bucket)
+    local_vectors = _load_local(namespace)
+    results: list[dict[str, Any]] = []
+    for item in local_vectors:
+        score = _cosine_similarity(vector, item.get("values") or item.get("vector") or [])
+        results.append({
+            "id": item.get("id"),
+            "score": float(score),
+            "metadata": item.get("metadata", {}),
+            "values": item.get("values", []) if include_values else [],
+        })
+    results.sort(key=lambda r: r["score"], reverse=True)
+    return results[:top_k]
 
 
 async def upsert_vector(
@@ -42,7 +103,22 @@ async def upsert_vector(
     if settings.VECTOR_PROVIDER == "pinecone":
         await _upsert_pinecone(tenant_id, bucket, vector_id, vector, metadata)
     else:
-        await _upsert_chroma(tenant_id, bucket, vector_id, vector, metadata)
+        if settings.VECTOR_PROVIDER == "chroma":
+            await _upsert_chroma(tenant_id, bucket, vector_id, vector, metadata)
+        else:
+            # local fallback persistence
+            namespace = tenant_namespace(tenant_id, bucket)
+            vectors = _load_local(namespace)
+            # replace if exists
+            replaced = False
+            for idx, item in enumerate(vectors):
+                if item.get("id") == vector_id:
+                    vectors[idx] = {"id": vector_id, "values": vector, "metadata": metadata}
+                    replaced = True
+                    break
+            if not replaced:
+                vectors.append({"id": vector_id, "values": vector, "metadata": metadata})
+            _save_local(namespace, vectors)
 
 
 async def _query_pinecone(

@@ -58,6 +58,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const raf = requestAnimationFrame(() => setAuth(readStoredAuth()));
+    // Attempt silent refresh if refresh token exists but no access token
+    const tryRefresh = async () => {
+      if (typeof window === "undefined") return;
+      const refresh = localStorage.getItem("aura_refresh_token");
+      const access = localStorage.getItem("aura_token");
+      if (refresh && !access) {
+        try {
+          const res = await fetch(`${API_BASE}/api/v1/auth/refresh`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ refresh_token: refresh }),
+          });
+          if (res.ok) {
+            const data = await res.json();
+            setAuth({ user: data.user, token: data.access_token, loading: false });
+            localStorage.setItem("aura_token", data.access_token);
+            localStorage.setItem("aura_refresh_token", data.refresh_token);
+            localStorage.setItem("aura_user", JSON.stringify(data.user));
+          } else {
+            // cleanup invalid refresh
+            localStorage.removeItem("aura_refresh_token");
+          }
+        } catch {
+          // ignore network errors
+        }
+      }
+    };
+    tryRefresh();
     return () => cancelAnimationFrame(raf);
   }, []);
 

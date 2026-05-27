@@ -15,6 +15,35 @@ AURA-CX is a tenant-isolated AI complaint intelligence and resolution platform f
 5. Run `docker compose up -d --build`.
 6. Open `http://localhost:3000` and sign in with the bootstrap admin account.
 
+## Development Commands
+
+Start backend in virtualenv:
+
+```powershell
+.venv\Scripts\Activate.ps1
+python -m uvicorn backend.main:app --reload --port 8000
+```
+
+Start workers (PowerShell):
+
+```powershell
+.\scripts\start-workers.ps1
+```
+
+Start workers (bash):
+
+```bash
+./scripts/start-workers.sh
+```
+
+Run backend tests:
+
+```powershell
+.venv\Scripts\python -m pytest -q
+```
+
+CI: See `.github/workflows/ci.yml` for the GitHub Actions configuration that runs backend tests and builds the frontend.
+
 ## Required Services
 
 - PostgreSQL 16: primary relational store.
