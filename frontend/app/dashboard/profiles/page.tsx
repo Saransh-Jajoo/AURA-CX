@@ -53,9 +53,9 @@ export default function ProfilesPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-12 gap-5">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
         {/* ── Profile List ───────────────────────────────── */}
-        <div className="col-span-3 glass-card overflow-hidden">
+        <div className="col-span-1 lg:col-span-3 glass-card overflow-hidden">
           <div className="px-4 py-3 border-b border-[var(--border-subtle)] space-y-2">
             <h3 className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">
               Customer Directory
@@ -104,7 +104,7 @@ export default function ProfilesPage() {
 
         {/* ── Profile Detail ─────────────────────────────── */}
         {detail && (
-          <div className="col-span-9 space-y-5">
+          <div className="col-span-1 lg:col-span-9 space-y-5">
             {/* Identity Card */}
             <motion.div
               key={detail.id}
@@ -176,7 +176,7 @@ export default function ProfilesPage() {
               </div>
             </motion.div>
 
-            <div className="grid grid-cols-2 gap-5">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               {/* Vector Radar */}
               <div className="glass-card p-5">
                 <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">

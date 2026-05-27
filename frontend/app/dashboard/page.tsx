@@ -307,10 +307,10 @@ export default function CommandCenterPage() {
   return (
     <div className="space-y-5">
       {/* ── Header ──────────────────────────────────────── */}
-      <div className="flex items-center justify-between flex-wrap gap-4">
-        <div className="flex items-center gap-3">
-          <h1 className="text-xl font-bold font-display">Incoming customer tickets</h1>
-          <div className="flex items-center gap-2 px-2.5 py-1 rounded-full bg-[var(--bg-inset)] border border-[var(--border-subtle)]">
+      <div className="flex items-center justify-between flex-wrap gap-3 sm:gap-4">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+          <h1 className="text-base sm:text-xl font-bold font-display truncate">Incoming customer tickets</h1>
+          <div className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-2.5 py-1 rounded-full bg-[var(--bg-inset)] border border-[var(--border-subtle)] shrink-0">
             {connected ? (
               <>
                 <Wifi className="w-3 h-3 text-[var(--accent-emerald)]" />
@@ -324,21 +324,21 @@ export default function CommandCenterPage() {
             )}
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="relative">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <div className="relative flex-1 sm:flex-none">
             <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search"
-              className="pl-9 pr-4 py-2 rounded-[var(--radius-md)] bg-[var(--bg-inset)] border border-[var(--border-subtle)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]/20 w-48 transition-all"
+              className="pl-9 pr-4 py-2 rounded-[var(--radius-md)] bg-[var(--bg-inset)] border border-[var(--border-subtle)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]/20 w-full sm:w-48 transition-all"
             />
           </div>
-          <button className="flex items-center gap-2 px-4 py-2 rounded-[var(--radius-md)] bg-[var(--accent-primary)]/8 border border-[var(--accent-primary)]/20 text-sm font-medium text-[var(--accent-primary)] hover:bg-[var(--accent-primary)]/15 transition-all">
+          <button className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-[var(--radius-md)] bg-[var(--accent-primary)]/8 border border-[var(--accent-primary)]/20 text-sm font-medium text-[var(--accent-primary)] hover:bg-[var(--accent-primary)]/15 transition-all shrink-0">
             <Filter className="w-3.5 h-3.5" />
-            Filter
+            <span className="hidden sm:inline">Filter</span>
           </button>
-          <button title="Add ticket" className="p-2 rounded-[var(--radius-md)] bg-[var(--accent-primary)] text-white hover:brightness-110 transition-all shadow-sm">
+          <button title="Add ticket" className="p-2 rounded-[var(--radius-md)] bg-[var(--accent-primary)] text-white hover:brightness-110 transition-all shadow-sm shrink-0">
             <Plus className="w-4 h-4" />
           </button>
         </div>
@@ -447,10 +447,10 @@ export default function CommandCenterPage() {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 60 }}
               transition={{ duration: 0.3, ease: [0.25, 0.1, 0.25, 1] }}
-              className="fixed right-0 top-0 bottom-0 w-full max-w-[800px] bg-[var(--bg-secondary)] border-l border-[var(--border-subtle)] z-50 overflow-y-auto shadow-2xl"
+              className="fixed right-0 top-0 bottom-0 w-full max-w-full sm:max-w-[85vw] md:max-w-[800px] bg-[var(--bg-secondary)] border-l border-[var(--border-subtle)] z-50 overflow-y-auto shadow-2xl"
             >
               {/* Panel Header */}
-              <div className="sticky top-0 z-10 flex items-center justify-between px-6 py-4 border-b border-[var(--border-subtle)] bg-[var(--bg-secondary)]/90 backdrop-blur-xl">
+              <div className="sticky top-0 z-10 flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-[var(--border-subtle)] bg-[var(--bg-secondary)]/90 backdrop-blur-xl">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-mono text-[var(--text-muted)]">{selectedTicket.id}</span>
                   <span className={cn("px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase", SEVERITY_CLASSES[selectedTicket.severity])}>
@@ -467,7 +467,7 @@ export default function CommandCenterPage() {
                 </button>
               </div>
 
-              <div className="p-6 space-y-6">
+              <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
                 {detailLoading ? (
                   <div className="flex flex-col items-center justify-center py-16 gap-3">
                     <div className="w-8 h-8 border-2 border-[var(--accent-primary)] border-t-transparent rounded-full animate-spin" />
@@ -556,7 +556,7 @@ export default function CommandCenterPage() {
                       </div>
 
                       {/* HITL Action Buttons */}
-                      <div className="flex items-center gap-3">
+                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
                         <button
                           onClick={handleApprove}
                           disabled={actionLoading !== null}
@@ -586,7 +586,7 @@ export default function CommandCenterPage() {
                       </div>
 
                       {/* ── Handoff Actions ─────────────────── */}
-                      <div className="flex items-center gap-3">
+                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
                         <button
                           onClick={async () => {
                             const waLink = (await createHandoffLink(selectedTicket.id, "whatsapp")).deep_link;

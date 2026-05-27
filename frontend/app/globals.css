@@ -536,11 +536,362 @@ input:focus, textarea:focus, select:focus, button:focus-visible {
 }
 
 /* ── Responsive ─────────────────────────────────────────── */
-@media (max-width: 1024px) {
-  .lg\:col-span-2 { grid-column: span 1 / span 1; }
-  .kanban-grid { grid-template-columns: 1fr !important; }
+
+/* ── Mobile-First Touch Utilities ──────────────────────── */
+.touch-target {
+  min-width: 44px;
+  min-height: 44px;
 }
 
-@media (max-width: 768px) {
-  .pipeline-tracker { display: none; }
+/* Safe area insets for notched devices (iPhone, Android punch-hole) */
+.safe-area-top { padding-top: env(safe-area-inset-top, 0px); }
+.safe-area-bottom { padding-bottom: env(safe-area-inset-bottom, 0px); }
+
+/* ── Mobile Bottom Navigation Bar ─────────────────────── */
+.mobile-bottom-nav {
+  display: none;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(20px) saturate(1.8);
+  backdrop-filter: blur(20px) saturate(1.8);
+  border-top: 1px solid var(--glass-border);
+  padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px)) 8px;
+}
+
+.mobile-bottom-nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  flex: 1;
+  padding: 6px 4px;
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.mobile-bottom-nav-item.active {
+  color: var(--accent-primary);
+  background: rgba(99, 102, 241, 0.08);
+}
+
+/* ── Mobile Slide-Over Panel ──────────────────────────── */
+.mobile-slide-panel {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+}
+
+/* ── Responsive Typography ─────────────────────────────── */
+@media (max-width: 480px) {
+  html { font-size: 14px; }
+}
+@media (min-width: 481px) and (max-width: 768px) {
+  html { font-size: 15px; }
+}
+@media (min-width: 769px) {
+  html { font-size: 16px; }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   BREAKPOINT: Extra-Small (phones, ≤480px)
+   ═══════════════════════════════════════════════════════════ */
+@media (max-width: 480px) {
+  /* Hide desktop sidebar */
+  aside { display: none !important; }
+
+  /* Hide pipeline tracker */
+  .pipeline-tracker { display: none !important; }
+
+  /* Show mobile bottom nav */
+  .mobile-bottom-nav { display: flex; }
+
+  /* Add bottom padding for bottom nav */
+  main {
+    padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+
+  /* Reduce page content padding */
+  main > div {
+    padding: 12px !important;
+    max-width: 100% !important;
+  }
+
+  /* Full-width header tabs should scroll */
+  header nav {
+    max-width: calc(100vw - 60px) !important;
+    gap: 0 !important;
+  }
+  header nav a > div {
+    padding: 6px 8px !important;
+  }
+  header nav a > div > span {
+    font-size: 11px !important;
+  }
+
+  /* Header bar compact */
+  header > div:first-child {
+    padding: 0 12px !important;
+    height: 48px !important;
+  }
+
+  /* KPI grid: 2 columns on phone */
+  .kpi-grid, [class*="grid-cols-6"], [class*="grid-cols-3"] {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
+  }
+
+  /* KPI card compact */
+  .glass-card.kpi-compact, .glass-card {
+    padding: 10px !important;
+  }
+
+  /* Kanban: single column */
+  .kanban-grid,
+  [class*="grid-cols-4"],
+  [class*="xl\\:grid-cols-4"] {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+
+  /* Kanban column max height reduced */
+  .kanban-column {
+    min-height: 300px !important;
+  }
+  .kanban-column > div:last-child {
+    max-height: 400px !important;
+  }
+
+  /* Enterprise pulse: 2 columns */
+  [class*="md\\:grid-cols-4"] {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  /* HITL detail panel: full width */
+  .hitl-panel, [class*="max-w-\\[800px\\]"] {
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+  .hitl-panel > div, [class*="max-w-\\[800px\\]"] > div {
+    padding: 12px !important;
+  }
+
+  /* HITL buttons: stack vertically */
+  .hitl-actions {
+    flex-direction: column !important;
+  }
+  .hitl-btn-approve, .hitl-btn-edit,
+  .hitl-btn-handoff-wa, .hitl-btn-handoff-bot {
+    padding: 12px 16px !important;
+    font-size: 12px !important;
+    width: 100% !important;
+  }
+
+  /* Prevent auto zoom on iOS/Android input focus */
+  input, textarea, select {
+    font-size: 16px !important;
+  }
+
+  /* Make h1 smaller */
+  h1 {
+    font-size: 1.1rem !important;
+  }
+
+  /* Search input: full width on mobile */
+  .search-container input, [class*="w-48"] {
+    width: 100% !important;
+    min-width: 120px !important;
+  }
+
+  /* Tags wrap more tightly */
+  .tag-badge {
+    font-size: 9px !important;
+    padding: 2px 6px !important;
+  }
+
+  /* Detail panel grid: stack */
+  [class*="lg\\:grid-cols-2"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Sentiment gauge: center and scale */
+  .sentiment-gauge {
+    max-width: 200px !important;
+    margin: 0 auto;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   BREAKPOINT: Small (large phones / small tablets, 481–768px)
+   ═══════════════════════════════════════════════════════════ */
+@media (min-width: 481px) and (max-width: 768px) {
+  /* Hide desktop sidebar */
+  aside { display: none !important; }
+
+  /* Hide pipeline tracker */
+  .pipeline-tracker { display: none !important; }
+
+  /* Show mobile bottom nav */
+  .mobile-bottom-nav { display: flex; }
+
+  /* Add bottom padding for bottom nav */
+  main {
+    padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+
+  /* Moderate page padding */
+  main > div {
+    padding: 16px !important;
+  }
+
+  /* KPI grid: 3 columns */
+  [class*="lg\\:grid-cols-6"] {
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 10px !important;
+  }
+
+  /* Kanban: 2 columns */
+  .kanban-grid,
+  [class*="xl\\:grid-cols-4"] {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 12px !important;
+  }
+
+  /* Enterprise pulse: 2 columns */
+  [class*="md\\:grid-cols-4"] {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  /* HITL panel: wider but not full */
+  [class*="max-w-\\[800px\\]"] {
+    max-width: 85vw !important;
+  }
+
+  /* Prevent auto zoom on input focus */
+  input, textarea, select {
+    font-size: 16px !important;
+  }
+
+  /* Detail panel grid: stack */
+  [class*="lg\\:grid-cols-2"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Header compact */
+  header > div:first-child {
+    padding: 0 14px !important;
+    height: 50px !important;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   BREAKPOINT: Medium (tablets, 769–1024px)
+   ═══════════════════════════════════════════════════════════ */
+@media (min-width: 769px) and (max-width: 1024px) {
+  /* Collapse sidebar to icon-only by default */
+  aside {
+    width: 72px !important;
+  }
+
+  /* Kanban: 2 columns */
+  .kanban-grid,
+  [class*="xl\\:grid-cols-4"] {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 14px !important;
+  }
+
+  /* KPI grid: 3 columns */
+  [class*="lg\\:grid-cols-6"] {
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 10px !important;
+  }
+
+  /* Main content padding */
+  main > div {
+    padding: 20px !important;
+  }
+
+  /* Detail panel */
+  [class*="max-w-\\[800px\\]"] {
+    max-width: 70vw !important;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   BREAKPOINT: Large (small laptops, 1025–1280px)
+   ═══════════════════════════════════════════════════════════ */
+@media (min-width: 1025px) and (max-width: 1280px) {
+  .kanban-grid,
+  [class*="xl\\:grid-cols-4"] {
+    grid-template-columns: repeat(3, 1fr) !important;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   BREAKPOINT: XL+ (wide desktops, 1281px+)
+   All defaults apply; 4-column Kanban, full sidebar
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── Landscape Phone (short height) ───────────────────── */
+@media (max-height: 500px) and (orientation: landscape) {
+  header > div:first-child {
+    height: 40px !important;
+  }
+  .pipeline-tracker { display: none !important; }
+  .mobile-bottom-nav { display: none !important; }
+  aside { display: block !important; width: 72px !important; }
+  main > div {
+    padding: 8px 12px !important;
+  }
+  .kanban-column {
+    min-height: 200px !important;
+  }
+}
+
+/* ── High-DPI / Retina Touch Refinements ──────────────── */
+@media (hover: none) and (pointer: coarse) {
+  /* Larger touch targets */
+  button, a, [role="button"] {
+    min-height: 40px;
+  }
+  /* Less hover effects — rely on active states */
+  .kanban-card:hover {
+    transform: none !important;
+  }
+  /* Active press feedback instead of hover */
+  .kanban-card:active {
+    transform: scale(0.98) !important;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1) !important;
+  }
+  button:active {
+    transform: scale(0.97);
+  }
+  /* Swipeable tabs */
+  header nav {
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* ── Print ──────────────────────────────────────────────── */
+@media print {
+  aside, .mobile-bottom-nav, .pipeline-tracker,
+  .alert-banner, header { display: none !important; }
+  main > div { padding: 0 !important; }
+  body { background: #fff; color: #000; }
+}
+
+/* Utility to hide scrollbars for horizontal slider containers (like mobile nav tabs) */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }

@@ -13,8 +13,22 @@ import { ThemeToggleCompact } from "@/components/theme-toggle";
 import { fetchShadowTickets } from "@/lib/api";
 import {
   Search, Bell, Settings, LayoutDashboard, Ticket, BarChart3,
-  Brain, Users,
+  Brain, Users, Menu, X,
 } from "lucide-react";
+
+/* ── Custom hook: detect screen width breakpoints ──────── */
+function useMediaQuery(query: string) {
+  const [matches, setMatches] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mql = window.matchMedia(query);
+    const handler = (e: MediaQueryListEvent) => setMatches(e.matches);
+    setMatches(mql.matches);
+    mql.addEventListener("change", handler);
+    return () => mql.removeEventListener("change", handler);
+  }, [query]);
+  return matches;
+}
 
 /* ── Top-level tab nav items matching mockup ─────────────── */
 const NAV_TABS = [
@@ -47,6 +61,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [alertVisible, setAlertVisible] = useState(true);
   const [alertMessage, setAlertMessage] = useState("");
   const [pipelineStage, setPipelineStage] = useState(0);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const isMobile = useMediaQuery("(max-width: 768px)");
+  const isTablet = useMediaQuery("(min-width: 769px) and (max-width: 1024px)");
+
+  // Auto-collapse sidebar on tablet
+  useEffect(() => {
+    if (isTablet) setCollapsed(true);
+  }, [isTablet]);
+
+  // Close mobile menu on navigation
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [pathname]);
 
   // Auth guard
   useEffect(() => {
@@ -119,9 +147,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="flex min-h-screen bg-[var(--bg-primary)]">
-      <Sidebar collapsed={collapsed} onToggle={() => setCollapsed(!collapsed)} />
+      {/* Desktop/Tablet Sidebar — hidden on mobile via CSS */}
+      {!isMobile && (
+        <Sidebar collapsed={collapsed} onToggle={() => setCollapsed(!collapsed)} />
+      )}
 
-      <div className="flex-1 flex flex-col overflow-x-hidden">
+      <div className="flex-1 flex flex-col overflow-x-hidden min-w-0">
         {/* ── HDBSCAN Alert Banner ─────────────────────── */}
         <AlertBanner
           message={alertMessage}
@@ -130,34 +161,34 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         />
 
         {/* ── Top Navigation Bar (Tabbed) ─────────────── */}
-        <header className="sticky top-0 z-30 bg-[var(--bg-secondary)]/80 backdrop-blur-xl border-b border-[var(--border-subtle)]">
-          <div className="flex items-center justify-between px-6 h-14">
-            {/* Logo + Tab Nav (matching mockup) */}
-            <div className="flex items-center gap-6">
-              <div className="flex items-center gap-2.5 mr-2">
+        <header className="sticky top-0 z-30 bg-[var(--bg-secondary)]/80 backdrop-blur-xl border-b border-[var(--border-subtle)] safe-area-top">
+          <div className="flex items-center justify-between px-3 sm:px-4 md:px-6 h-12 sm:h-14">
+            {/* Logo + Tab Nav */}
+            <div className="flex items-center gap-2 sm:gap-4 md:gap-6 min-w-0 flex-1">
+              <div className="flex items-center gap-2 shrink-0">
                 <Image
                   src="/logo_w.png"
                   alt="AURA-CX"
-                  width={28}
-                  height={28}
-                  className="logo-adaptive object-contain"
+                  width={24}
+                  height={24}
+                  className="logo-adaptive object-contain sm:w-7 sm:h-7"
                 />
-                <span className="font-display text-sm font-bold tracking-tight hidden lg:inline">
+                <span className="font-display text-sm font-bold tracking-tight hidden md:inline">
                   AURA-CX
                 </span>
               </div>
 
-              {/* Tabs */}
-              <nav className="flex items-center gap-0.5">
+              {/* Tabs — scrollable on all sizes */}
+              <nav className="flex items-center gap-0.5 overflow-x-auto no-scrollbar whitespace-nowrap scroll-smooth shrink min-w-0 py-0.5">
                 {NAV_TABS.map((tab) => {
                   const isActive = pathname === tab.href ||
                     (tab.href !== "/dashboard" && pathname.startsWith(tab.href));
                   const Icon = tab.icon;
                   return (
                     <Link key={tab.href} href={tab.href}>
-                      <div className="relative flex items-center gap-1.5 px-3 py-2 rounded-[var(--radius-sm)] transition-colors">
-                        <Icon className={`w-3.5 h-3.5 ${isActive ? "text-[var(--accent-primary)]" : "text-[var(--text-muted)]"}`} />
-                        <span className={`text-[12px] font-medium ${isActive ? "text-[var(--accent-primary)]" : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"}`}>
+                      <div className="relative flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 rounded-[var(--radius-sm)] transition-colors">
+                        <Icon className={`w-3.5 h-3.5 shrink-0 ${isActive ? "text-[var(--accent-primary)]" : "text-[var(--text-muted)]"}`} />
+                        <span className={`text-[11px] sm:text-[12px] font-medium ${isActive ? "text-[var(--accent-primary)]" : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"}`}>
                           {tab.label}
                         </span>
                         {isActive && (
@@ -175,10 +206,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </div>
 
             {/* Right section */}
-            <div className="flex items-center gap-2">
-              <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-sm)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)] transition-all text-xs font-medium">
+            <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+              <button className="hidden sm:flex items-center gap-1.5 px-2 sm:px-3 py-1.5 rounded-[var(--radius-sm)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)] transition-all text-xs font-medium">
                 <Settings className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Settings</span>
+                <span className="hidden lg:inline">Settings</span>
               </button>
               <ThemeToggleCompact />
               <button title="Notifications" className="relative p-2 rounded-[var(--radius-sm)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)] transition-all">
@@ -188,8 +219,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </div>
           </div>
 
-          {/* ── Pipeline Tracker ─────────────────────────── */}
-          <div className="border-t border-[var(--border-subtle)]">
+          {/* ── Pipeline Tracker — hidden on mobile via CSS ── */}
+          <div className="border-t border-[var(--border-subtle)] pipeline-tracker-wrapper">
             <PipelineTracker
               activeStage={pipelineStage}
               onStageClick={(i) => setPipelineStage(i)}
@@ -199,7 +230,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         {/* ── Page Content with transitions ───────────── */}
         <main className="flex-1">
-          <div className="max-w-[1600px] mx-auto p-6">
+          <div className="max-w-[1600px] mx-auto p-3 sm:p-4 md:p-6">
             <AnimatePresence mode="wait">
               <motion.div
                 key={pathname}
@@ -214,6 +245,24 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
         </main>
       </div>
+
+      {/* ── Mobile Bottom Navigation Bar ─────────────── */}
+      {isMobile && (
+        <nav className="mobile-bottom-nav" role="navigation" aria-label="Mobile navigation">
+          {NAV_TABS.map((tab) => {
+            const isActive = pathname === tab.href ||
+              (tab.href !== "/dashboard" && pathname.startsWith(tab.href));
+            const Icon = tab.icon;
+            return (
+              <Link key={tab.href} href={tab.href} className={`mobile-bottom-nav-item ${isActive ? "active" : ""}`}>
+                <Icon className="w-5 h-5" />
+                <span>{tab.label}</span>
+              </Link>
+            );
+          })}
+        </nav>
+      )}
     </div>
   );
 }
+

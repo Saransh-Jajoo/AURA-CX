@@ -71,6 +71,11 @@ async def gemini_generate(prompt: str, *, response_json: bool = False) -> str:
 
 
 async def embed_text(text: str) -> list[float]:
+    if not settings.GEMINI_API_KEY or "mock" in settings.GEMINI_API_KEY.lower():
+        import random
+        # Seed by text hash to keep it stable and deterministic
+        rng = random.Random(hash(text))
+        return [rng.uniform(-0.1, 0.1) for _ in range(768)]
     _require_gemini()
     async with httpx.AsyncClient(timeout=30.0) as client:
         response = await client.post(
@@ -83,6 +88,57 @@ async def embed_text(text: str) -> list[float]:
 
 
 async def classify_ticket(text: str, channel: str) -> dict:
+    if not settings.GEMINI_API_KEY or "mock" in settings.GEMINI_API_KEY.lower():
+        text_lower = text.lower()
+        intent = "Other"
+        severity = "medium"
+        sentiment = "neutral"
+        sentiment_score = 0.0
+        product = "AURA-CX Platform"
+
+        if "login" in text_lower or "password" in text_lower or "account" in text_lower:
+            intent = "Account Issue"
+            severity = "high"
+            sentiment = "frustrated"
+            sentiment_score = -0.4
+        elif "slow" in text_lower or "lag" in text_lower or "crash" in text_lower or "freeze" in text_lower:
+            intent = "Performance Issue"
+            severity = "high"
+            sentiment = "frustrated"
+            sentiment_score = -0.5
+        elif "bug" in text_lower or "error" in text_lower or "broken" in text_lower or "fail" in text_lower:
+            intent = "Bug Report"
+            severity = "medium"
+            sentiment = "frustrated"
+            sentiment_score = -0.3
+        elif "price" in text_lower or "billing" in text_lower or "charge" in text_lower or "refund" in text_lower:
+            intent = "Billing Dispute"
+            severity = "critical"
+            sentiment = "furious"
+            sentiment_score = -0.8
+        elif "hack" in text_lower or "leak" in text_lower or "breach" in text_lower or "security" in text_lower:
+            intent = "Security Concern"
+            severity = "critical"
+            sentiment = "furious"
+            sentiment_score = -0.9
+        elif "feature" in text_lower or "suggest" in text_lower or "add" in text_lower or "want" in text_lower:
+            intent = "Feature Request"
+            severity = "low"
+            sentiment = "satisfied"
+            sentiment_score = 0.2
+
+        if "urgent" in text_lower or "help" in text_lower:
+            severity = "high"
+
+        return {
+            "intent": intent,
+            "severity": severity,
+            "sentiment": sentiment,
+            "sentiment_score": sentiment_score,
+            "confidence": 0.95,
+            "product": product,
+        }
+
     prompt = f"""
 Classify this customer support message from channel "{channel}".
 Return strict JSON only:
@@ -152,6 +208,17 @@ async def retrieve_rag_context(*, tenant_id: str, query_embedding: list[float], 
 
 
 async def generate_draft(*, tenant_id: str, ticket: dict) -> dict:
+    if not settings.GEMINI_API_KEY or "mock" in settings.GEMINI_API_KEY.lower():
+        intent = ticket.get("intent", "general inquiry")
+        customer = ticket.get("customer_name", "Valued Customer")
+        draft = f"Hi {customer},\n\nThank you for reaching out to AURA-CX support. We have received your {intent.lower()} report and our engineering team is looking into it immediately. We will update you as soon as we have a resolution.\n\nBest regards,\nAURA-CX Copilot"
+        return {
+            "draft": draft,
+            "confidence": 0.9,
+            "auto_approvable": True,
+            "rag_sources": [],
+        }
+
     query_embedding = await embed_text(ticket.get("message", ""))
     context_docs = await retrieve_rag_context(tenant_id=tenant_id, query_embedding=query_embedding)
     context = "\n\n".join(

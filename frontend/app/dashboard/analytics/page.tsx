@@ -413,55 +413,59 @@ function AgentsTab() {
         </div>
       ) : (
         <div className="glass-card overflow-hidden">
-          <div className="grid grid-cols-[2fr_1fr_1fr_1fr_1fr] text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)] px-5 py-3 border-b border-[var(--border-subtle)] bg-[var(--bg-inset)]">
-            <span>Agent</span>
-            <span className="text-center">Tickets</span>
-            <span className="text-center">Avg Time</span>
-            <span className="text-center">CSAT</span>
-            <span className="text-center">Escalations</span>
-          </div>
-          {agents.map((agent, i) => (
-            <motion.div
-              key={agent.agent_id}
-              initial={{ opacity: 0, x: -8 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: i * 0.05 }}
-              className="grid grid-cols-[2fr_1fr_1fr_1fr_1fr] px-5 py-3.5 border-b border-[var(--border-subtle)] hover:bg-[var(--bg-inset)] transition-colors items-center"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-7 h-7 rounded-full bg-[var(--accent-primary)]/20 flex items-center justify-center text-xs font-bold text-[var(--accent-primary)]">
-                  {i + 1}
-                </div>
-                <div>
-                  <p className="text-sm font-medium">{agent.name}</p>
-                  <div className="w-24 h-1 mt-1 rounded-full bg-[var(--bg-secondary)] overflow-hidden">
-                    <motion.div
-                      initial={{ width: 0 }}
-                      animate={{ width: `${(agent.tickets / maxTickets) * 100}%` }}
-                      transition={{ duration: 0.8, delay: i * 0.05 }}
-                      className="h-full rounded-full bg-[var(--accent-primary)]"
-                    />
-                  </div>
-                </div>
+          <div className="overflow-x-auto no-scrollbar">
+            <div className="min-w-[600px]">
+              <div className="grid grid-cols-[2fr_1fr_1fr_1fr_1fr] text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)] px-5 py-3 border-b border-[var(--border-subtle)] bg-[var(--bg-inset)]">
+                <span>Agent</span>
+                <span className="text-center">Tickets</span>
+                <span className="text-center">Avg Time</span>
+                <span className="text-center">CSAT</span>
+                <span className="text-center">Escalations</span>
               </div>
-              <p className="text-sm font-semibold text-center">{agent.tickets}</p>
-              <p className="text-sm text-center">
-                <span className={cn("font-semibold", agent.avg_resolution_hours < 2 ? "text-[var(--accent-emerald)]" : agent.avg_resolution_hours > 8 ? "text-[var(--accent-rose)]" : "")}>
-                  {agent.avg_resolution_hours}h
-                </span>
-              </p>
-              <p className="text-sm text-center">
-                {agent.avg_csat != null ? (
-                  <span className={cn("font-semibold", agent.avg_csat >= 4 ? "text-[var(--accent-emerald)]" : agent.avg_csat >= 3 ? "text-[var(--accent-amber)]" : "text-[var(--accent-rose)]")}>
-                    {agent.avg_csat} ⭐
-                  </span>
-                ) : <span className="text-[var(--text-muted)]">—</span>}
-              </p>
-              <p className={cn("text-sm font-semibold text-center", agent.escalations > 0 ? "text-[var(--accent-amber)]" : "text-[var(--accent-emerald)]")}>
-                {agent.escalations}
-              </p>
-            </motion.div>
-          ))}
+              {agents.map((agent, i) => (
+                <motion.div
+                  key={agent.agent_id}
+                  initial={{ opacity: 0, x: -8 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: i * 0.05 }}
+                  className="grid grid-cols-[2fr_1fr_1fr_1fr_1fr] px-5 py-3.5 border-b border-[var(--border-subtle)] hover:bg-[var(--bg-inset)] transition-colors items-center"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-7 h-7 rounded-full bg-[var(--accent-primary)]/20 flex items-center justify-center text-xs font-bold text-[var(--accent-primary)]">
+                      {i + 1}
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">{agent.name}</p>
+                      <div className="w-24 h-1 mt-1 rounded-full bg-[var(--bg-secondary)] overflow-hidden">
+                        <motion.div
+                          initial={{ width: 0 }}
+                          animate={{ width: `${(agent.tickets / maxTickets) * 100}%` }}
+                          transition={{ duration: 0.8, delay: i * 0.05 }}
+                          className="h-full rounded-full bg-[var(--accent-primary)]"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <p className="text-sm font-semibold text-center">{agent.tickets}</p>
+                  <p className="text-sm text-center">
+                    <span className={cn("font-semibold", agent.avg_resolution_hours < 2 ? "text-[var(--accent-emerald)]" : agent.avg_resolution_hours > 8 ? "text-[var(--accent-rose)]" : "")}>
+                      {agent.avg_resolution_hours}h
+                    </span>
+                  </p>
+                  <p className="text-sm text-center">
+                    {agent.avg_csat != null ? (
+                      <span className={cn("font-semibold", agent.avg_csat >= 4 ? "text-[var(--accent-emerald)]" : agent.avg_csat >= 3 ? "text-[var(--accent-amber)]" : "text-[var(--accent-rose)]")}>
+                        {agent.avg_csat} ⭐
+                      </span>
+                    ) : <span className="text-[var(--text-muted)]">—</span>}
+                  </p>
+                  <p className={cn("text-sm font-semibold text-center", agent.escalations > 0 ? "text-[var(--accent-amber)]" : "text-[var(--accent-emerald)]")}>
+                    {agent.escalations}
+                  </p>
+                </motion.div>
+              ))}
+            </div>
+          </div>
         </div>
       )}
     </div>

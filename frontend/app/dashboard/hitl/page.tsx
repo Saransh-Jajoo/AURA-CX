@@ -302,9 +302,9 @@ export default function HITLPage() {
         </p>
       </div>
 
-      <div className="grid grid-cols-12 gap-5">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
         {/* ── Queue List ──────────────────────────────────── */}
-        <div className="col-span-4 glass-card overflow-hidden">
+        <div className="col-span-1 lg:col-span-4 glass-card overflow-hidden">
           <div className="px-4 py-3 border-b border-[var(--border-subtle)] flex items-center justify-between">
             <h3 className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">
               Pending Review
@@ -355,7 +355,7 @@ export default function HITLPage() {
         </div>
 
         {/* ── Review Panel ────────────────────────────────── */}
-        <div className="col-span-8 space-y-5">
+        <div className="col-span-1 lg:col-span-8 space-y-5">
           <AnimatePresence mode="wait">
             {item && (
               <motion.div

@@ -1,6 +1,14 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { Providers } from "./providers";
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: "cover",
+};
 
 export const metadata: Metadata = {
   title: "AURA-CX | Intelligent Customer Experience Orchestrator",
@@ -10,6 +18,11 @@ export const metadata: Metadata = {
     title: "AURA-CX | Intelligent CX Orchestrator",
     description: "AI-powered omnichannel CX command center",
     type: "website",
+  },
+  other: {
+    "mobile-web-app-capable": "yes",
+    "apple-mobile-web-app-capable": "yes",
+    "apple-mobile-web-app-status-bar-style": "black-translucent",
   },
 };
 

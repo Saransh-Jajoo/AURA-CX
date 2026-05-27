@@ -33,34 +33,34 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[var(--bg-primary)] px-4">
+    <div className="min-h-screen flex items-center justify-center bg-[var(--bg-primary)] px-4 py-8 safe-area-top safe-area-bottom">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}
-        className="w-full max-w-[420px]"
+        className="w-full max-w-[420px] sm:max-w-[420px]"
       >
-        <div className="text-center mb-8">
-          <Image src="/logo_w.png" alt="AURA-CX" width={72} height={72} className="logo-adaptive mx-auto mb-4" priority />
-          <h1 className="font-display text-xl font-bold tracking-tight mb-1">AURA-CX</h1>
-          <p className="text-sm text-[var(--text-muted)]">Secure tenant workspace</p>
+        <div className="text-center mb-6 sm:mb-8">
+          <Image src="/logo_w.png" alt="AURA-CX" width={56} height={56} className="logo-adaptive mx-auto mb-3 sm:mb-4 sm:w-[72px] sm:h-[72px]" priority />
+          <h1 className="font-display text-lg sm:text-xl font-bold tracking-tight mb-1">AURA-CX</h1>
+          <p className="text-xs sm:text-sm text-[var(--text-muted)]">Secure tenant workspace</p>
         </div>
 
-        <div className="glass-card p-8">
-          <h2 className="text-base font-semibold mb-6 text-center">Sign in</h2>
+        <div className="glass-card p-5 sm:p-8">
+          <h2 className="text-base font-semibold mb-5 sm:mb-6 text-center">Sign in</h2>
 
           {error && (
             <motion.div
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: "auto" }}
-              className="flex items-center gap-2 text-sm text-[var(--accent-rose)] bg-[var(--accent-rose)]/8 border border-[var(--accent-rose)]/15 rounded-[var(--radius-md)] px-4 py-3 mb-4"
+              className="flex items-center gap-2 text-sm text-[var(--accent-rose)] bg-[var(--accent-rose)]/8 border border-[var(--accent-rose)]/15 rounded-[var(--radius-md)] px-3 sm:px-4 py-2.5 sm:py-3 mb-4"
             >
               <AlertTriangle className="w-4 h-4 shrink-0" />
               {error}
             </motion.div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4">
             <div>
               <label className="block text-[11px] font-medium text-[var(--text-muted)] mb-1.5 uppercase tracking-wider">
                 Email
@@ -70,7 +70,8 @@ export default function LoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="w-full px-4 py-3 rounded-[var(--radius-md)] bg-[var(--bg-inset)] border border-[var(--border-subtle)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]/20 focus:border-[var(--accent-primary)]/30 transition-all text-sm"
+                autoComplete="email"
+                className="w-full px-4 py-3 rounded-[var(--radius-md)] bg-[var(--bg-inset)] border border-[var(--border-subtle)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]/20 focus:border-[var(--accent-primary)]/30 transition-all text-[16px] sm:text-sm"
                 placeholder="you@company.com"
               />
             </div>
@@ -84,13 +85,14 @@ export default function LoginPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  className="w-full px-4 py-3 pr-11 rounded-[var(--radius-md)] bg-[var(--bg-inset)] border border-[var(--border-subtle)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]/20 focus:border-[var(--accent-primary)]/30 transition-all text-sm"
+                  autoComplete="current-password"
+                  className="w-full px-4 py-3 pr-11 rounded-[var(--radius-md)] bg-[var(--bg-inset)] border border-[var(--border-subtle)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]/20 focus:border-[var(--accent-primary)]/30 transition-all text-[16px] sm:text-sm"
                   placeholder="Password"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPw(!showPw)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors p-1"
                   title={showPw ? "Hide password" : "Show password"}
                 >
                   {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -101,7 +103,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 rounded-[var(--radius-md)] font-semibold text-sm text-white bg-[var(--accent-primary)] hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 shadow-lg shadow-[var(--accent-primary)]/15 active:scale-[0.98]"
+              className="w-full py-3 sm:py-3 rounded-[var(--radius-md)] font-semibold text-sm text-white bg-[var(--accent-primary)] hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 shadow-lg shadow-[var(--accent-primary)]/15 active:scale-[0.98] min-h-[48px]"
             >
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
               {loading ? "Authenticating..." : "Sign In"}
@@ -109,7 +111,7 @@ export default function LoginPage() {
           </form>
         </div>
 
-        <p className="text-center text-[10px] text-[var(--text-muted)] mt-6 font-mono">AURA-CX v1.0</p>
+        <p className="text-center text-[10px] text-[var(--text-muted)] mt-4 sm:mt-6 font-mono">AURA-CX v1.0</p>
       </motion.div>
     </div>
   );
