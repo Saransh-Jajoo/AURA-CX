@@ -12,6 +12,11 @@ import type { TenantSettings, BYOIStatus } from "@/lib/types";
 const SERVICE_CONFIG = [
   { key: "gemini", label: "Google Gemini AI", icon: Brain, fields: [{ name: "gemini_api_key", label: "API Key", type: "password" }] },
   { key: "openai", label: "OpenAI", icon: Brain, fields: [{ name: "openai_api_key", label: "API Key", type: "password" }] },
+  { key: "anthropic", label: "Anthropic Claude", icon: Brain, fields: [{ name: "anthropic_api_key", label: "API Key", type: "password" }] },
+  { key: "mistral", label: "Mistral AI", icon: Brain, fields: [{ name: "mistral_api_key", label: "API Key", type: "password" }] },
+  { key: "openrouter", label: "OpenRouter", icon: Brain, fields: [{ name: "openrouter_api_key", label: "API Key", type: "password" }] },
+  { key: "ollama", label: "Ollama", icon: Server, fields: [{ name: "ollama_base_url", label: "Base URL", type: "text" }] },
+  { key: "self_hosted", label: "Self-hosted AI", icon: Server, fields: [{ name: "self_hosted_base_url", label: "Base URL", type: "text" }, { name: "self_hosted_api_key", label: "API Key", type: "password" }] },
   { key: "pinecone", label: "Pinecone Vector DB", icon: Server, fields: [{ name: "pinecone_api_key", label: "API Key", type: "password" }, { name: "pinecone_host", label: "Host URL", type: "text" }] },
   { key: "smtp", label: "SMTP Email", icon: Mail, fields: [{ name: "smtp_host", label: "Host", type: "text" }, { name: "smtp_port", label: "Port", type: "number" }, { name: "smtp_user", label: "Username", type: "text" }, { name: "smtp_pass", label: "Password", type: "password" }] },
   { key: "twilio", label: "Twilio Voice", icon: Phone, fields: [{ name: "twilio_sid", label: "Account SID", type: "password" }, { name: "twilio_token", label: "Auth Token", type: "password" }, { name: "twilio_phone", label: "Phone Number", type: "text" }] },

@@ -32,7 +32,7 @@ async def set_tenant_context(session: AsyncSession, tenant_id: str) -> None:
     """
     from sqlalchemy import text
     # Use parameterized query to prevent SQL injection
-    await session.execute(text("SET app.current_tenant = :tid"), {"tid": tenant_id})
+    await session.execute(text("SELECT set_config('app.current_tenant', :tid, true)"), {"tid": tenant_id})
 
 
 async def init_db() -> None:
@@ -41,6 +41,15 @@ async def init_db() -> None:
         # Incremental column migrations — safe to re-run (IF NOT EXISTS)
         _platform_columns = [
             ("x_bearer_token_enc", "TEXT"),
+            ("anthropic_api_key_enc", "TEXT"),
+            ("mistral_api_key_enc", "TEXT"),
+            ("openrouter_api_key_enc", "TEXT"),
+            ("ollama_base_url", "VARCHAR(512)"),
+            ("self_hosted_base_url", "VARCHAR(512)"),
+            ("self_hosted_api_key_enc", "TEXT"),
+            ("ai_provider", "VARCHAR(32) DEFAULT 'gemini' NOT NULL"),
+            ("ai_model", "VARCHAR(128)"),
+            ("ai_fallback_order", "JSONB DEFAULT '[]'::jsonb NOT NULL"),
             ("x_api_key_enc", "TEXT"),
             ("x_api_secret_enc", "TEXT"),
             ("x_access_token_enc", "TEXT"),

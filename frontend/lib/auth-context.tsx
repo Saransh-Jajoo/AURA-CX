@@ -2,7 +2,7 @@
 
 import React, { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 
-export type UserRole = "super_admin" | "tenant_admin" | "executive" | "qa_reviewer" | "support_agent";
+export type UserRole = "super_admin" | "tenant_admin" | "executive" | "manager" | "support_agent" | "qa_reviewer" | "read_only_analyst";
 
 export interface User {
   id: string;
@@ -43,6 +43,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { user: JSON.parse(savedUser) as User, token: saved, loading: false };
       } catch {
         localStorage.removeItem("aura_token");
+        localStorage.removeItem("aura_refresh_token");
         localStorage.removeItem("aura_user");
       }
     }
@@ -78,13 +79,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const data = await res.json();
     setAuth({ user: data.user, token: data.access_token, loading: false });
     localStorage.setItem("aura_token", data.access_token);
+    localStorage.setItem("aura_refresh_token", data.refresh_token);
     localStorage.setItem("aura_user", JSON.stringify(data.user));
     document.cookie = `aura_token=${data.access_token}; path=/; max-age=${8 * 3600}; SameSite=Lax`;
   }, []);
 
   const logout = useCallback(() => {
+    const refreshToken = localStorage.getItem("aura_refresh_token");
+    const accessToken = localStorage.getItem("aura_token");
+    if (refreshToken && accessToken) {
+      fetch(`${API_BASE}/api/v1/auth/logout`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+        body: JSON.stringify({ refresh_token: refreshToken }),
+      }).catch(() => undefined);
+    }
     setAuth({ user: null, token: null, loading: false });
     localStorage.removeItem("aura_token");
+    localStorage.removeItem("aura_refresh_token");
     localStorage.removeItem("aura_user");
     document.cookie = "aura_token=; path=/; max-age=0; SameSite=Lax";
   }, []);
@@ -134,14 +146,18 @@ export const ROLE_ROUTES: Record<UserRole, string[]> = {
     "/dashboard/compliance",
   ],
   executive: ["/dashboard", "/dashboard/executive", "/dashboard/analytics", "/dashboard/subscriptions", "/dashboard/profiles", "/dashboard/compliance"],
+  manager: ["/dashboard", "/dashboard/analytics", "/dashboard/profiles", "/dashboard/hitl", "/dashboard/shadow-tickets", "/dashboard/qa-review", "/dashboard/knowledge", "/dashboard/team", "/dashboard/voice", "/dashboard/compliance"],
   qa_reviewer: ["/dashboard", "/dashboard/qa-review", "/dashboard/hitl", "/dashboard/analytics", "/dashboard/profiles", "/dashboard/knowledge", "/dashboard/voice"],
   support_agent: ["/dashboard", "/dashboard/profiles", "/dashboard/hitl", "/dashboard/knowledge", "/dashboard/voice"],
+  read_only_analyst: ["/dashboard", "/dashboard/analytics", "/dashboard/profiles", "/dashboard/knowledge", "/dashboard/compliance"],
 };
 
 export const ROLE_DEFAULT_ROUTE: Record<UserRole, string> = {
   super_admin: "/dashboard/admin",
   tenant_admin: "/dashboard/admin",
   executive: "/dashboard/executive",
+  manager: "/dashboard",
   qa_reviewer: "/dashboard/qa-review",
   support_agent: "/dashboard",
+  read_only_analyst: "/dashboard/analytics",
 };

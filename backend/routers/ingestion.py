@@ -1,4 +1,4 @@
-"""Signed live webhooks for X, Reddit, and Gmail."""
+"""Signed live webhooks for X, Reddit, Gmail, WhatsApp, and web forms."""
 
 from __future__ import annotations
 
@@ -20,10 +20,11 @@ from services import ai_service
 from services.deduplication import get_dedup_service
 from services.realtime import manager, ticket_to_dict
 from services.scrubbing import scrub_text
+from services.sla_engine import assign_sla
 
 router = APIRouter()
 
-ALLOWED_CHANNELS = {"x", "reddit", "gmail"}
+ALLOWED_CHANNELS = {"x", "reddit", "gmail", "whatsapp", "web_form"}
 
 
 class WebhookPayload(BaseModel):
@@ -42,7 +43,7 @@ class WebhookPayload(BaseModel):
             return value
         value = value.lower().strip()
         if value not in ALLOWED_CHANNELS:
-            raise ValueError("channel must be x, reddit, or gmail")
+            raise ValueError("channel must be x, reddit, gmail, whatsapp, or web_form")
         return value
 
 
@@ -81,7 +82,7 @@ async def _get_or_create_profile(
     embedding: list[float],
 ) -> tuple[CustomerProfile, dict]:
     identity = {"matched": False, "cosine_similarity": 0.0, "method": "Vector Similarity (Cosine > 0.92)"}
-    email = handle.lower() if channel == "gmail" and "@" in handle else None
+    email = handle.lower() if channel in {"gmail", "web_form"} and "@" in handle else None
 
     if email:
         profile = await session.scalar(select(CustomerProfile).where(CustomerProfile.tenant_id == tenant_id, CustomerProfile.email == email))
@@ -106,6 +107,8 @@ async def _get_or_create_profile(
             query = query.where(CustomerProfile.x_handle == handle)
         elif channel == "reddit":
             query = query.where(CustomerProfile.reddit_handle == handle)
+        elif channel == "whatsapp":
+            query = query.where(CustomerProfile.whatsapp_id == handle)
         profile = await session.scalar(query)
 
     if profile is None:
@@ -114,6 +117,8 @@ async def _get_or_create_profile(
             profile.x_handle = handle
         elif channel == "reddit":
             profile.reddit_handle = handle
+        elif channel == "whatsapp":
+            profile.whatsapp_id = handle
         session.add(profile)
         await session.flush()
     else:
@@ -121,8 +126,10 @@ async def _get_or_create_profile(
             profile.x_handle = handle
         if channel == "reddit" and not profile.reddit_handle:
             profile.reddit_handle = handle
+        if channel == "whatsapp" and not profile.whatsapp_id:
+            profile.whatsapp_id = handle
 
-    vector_key = "x_vector" if channel == "x" else "reddit_vector"
+    vector_key = f"{channel}_vector"
     profile.identity_vectors = {**(profile.identity_vectors or {}), vector_key: embedding[:8]}
     profile.identity_score = max(profile.identity_score or 0, float(identity.get("cosine_similarity") or 0))
     profile.identity_method = identity.get("method")
@@ -188,6 +195,8 @@ async def process_webhook_payload(
         },
     )
     session.add(ticket)
+    await session.flush()
+    await assign_sla(session, ticket)
     await session.commit()
     await session.refresh(ticket)
     await manager.broadcast(tenant_id, {"type": "new_ticket", "ticket": ticket_to_dict(ticket)})
@@ -316,4 +325,3 @@ async def ingest_with_jwt(
         sources=list(sources),
     )
     return {"status": "ingested", "ticket": ticket_to_dict(ticket)}
-

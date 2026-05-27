@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import settings
 from database import get_session
-from models import Ticket, TicketMessage, User
+from models import Ticket, TicketMessage, TicketTimelineEvent, User
 from security import require_roles
 from services.notification import (
     build_handoff_email_html,
@@ -75,6 +75,20 @@ async def _get_ticket(session: AsyncSession, ticket_id: str, tenant_id: str) -> 
     return ticket
 
 
+def _record_timeline(session: AsyncSession, ticket: Ticket, user: User | None, event_type: str, previous_status: str | None, note: str | None = None) -> None:
+    session.add(
+        TicketTimelineEvent(
+            ticket_id=ticket.id,
+            tenant_id=ticket.tenant_id,
+            actor_id=user.id if user else None,
+            event_type=event_type,
+            previous_status=previous_status,
+            new_status=ticket.status,
+            note=note,
+        )
+    )
+
+
 def _serialize_message(msg: TicketMessage) -> dict:
     return {
         "id": msg.id,
@@ -93,7 +107,7 @@ def _serialize_message(msg: TicketMessage) -> dict:
 async def handoff_to_private_channel(
     ticket_id: str,
     body: HandoffPrivateRequest,
-    user: Annotated[User, Depends(require_roles("tenant_admin", "support_agent", "senior_agent"))],
+    user: Annotated[User, Depends(require_roles("tenant_admin", "manager", "support_agent"))],
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> dict:
     """Move a ticket to a private channel (email or WhatsApp) and notify the customer."""
@@ -107,6 +121,7 @@ async def handoff_to_private_channel(
     ticket.private_channel_token = token
     ticket.private_channel_address = body.address
     ticket.handoff_at = _utcnow()
+    previous_status = ticket.status
     ticket.status = "awaiting_reply"
 
     # Record system message in thread
@@ -119,6 +134,7 @@ async def handoff_to_private_channel(
         is_internal=True,
     )
     session.add(system_msg)
+    _record_timeline(session, ticket, user, "ticket.handoff_private", previous_status, body.intro_message)
 
     # Build and send notification
     text_body = f"{body.intro_message}\n\nContinue here: {chat_url}"
@@ -150,7 +166,7 @@ async def handoff_to_private_channel(
 @router.get("/tickets/{ticket_id}/messages")
 async def get_ticket_messages(
     ticket_id: str,
-    user: Annotated[User, Depends(require_roles("tenant_admin", "support_agent", "senior_agent", "qa_reviewer"))],
+    user: Annotated[User, Depends(require_roles("tenant_admin", "manager", "support_agent", "qa_reviewer"))],
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> dict:
     """Get all messages in the private thread for a ticket (agent view — includes internal notes)."""
@@ -175,7 +191,7 @@ async def get_ticket_messages(
 async def agent_send_message(
     ticket_id: str,
     body: AgentMessageRequest,
-    user: Annotated[User, Depends(require_roles("tenant_admin", "support_agent", "senior_agent"))],
+    user: Annotated[User, Depends(require_roles("tenant_admin", "manager", "support_agent"))],
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> dict:
     """Agent sends a message into the private thread (or an internal note)."""
@@ -201,7 +217,9 @@ async def agent_send_message(
             text_body=f"Your support agent replied:\n\n{body.content}\n\nView thread: {chat_url}",
         )
 
+    previous_status = ticket.status
     ticket.status = "in_progress"
+    _record_timeline(session, ticket, user, "ticket.agent_message", previous_status, "internal" if body.is_internal else "customer_reply")
     await session.commit()
     return {"status": "ok", "message": _serialize_message(msg)}
 
@@ -210,12 +228,13 @@ async def agent_send_message(
 async def resolve_ticket(
     ticket_id: str,
     body: ResolveRequest,
-    user: Annotated[User, Depends(require_roles("tenant_admin", "support_agent", "senior_agent"))],
+    user: Annotated[User, Depends(require_roles("tenant_admin", "manager", "support_agent"))],
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> dict:
     """Resolve a ticket, record resolution time, and notify the customer."""
     ticket = await _get_ticket(session, ticket_id, user.tenant_id)
 
+    previous_status = ticket.status
     ticket.status = "resolved"
     ticket.resolved_at = _utcnow()
     ticket.resolved_by = user.id
@@ -231,6 +250,7 @@ async def resolve_ticket(
         is_internal=False,
     )
     session.add(system_msg)
+    _record_timeline(session, ticket, user, "ticket.resolved", previous_status, body.resolution_note)
 
     # Notify customer on their private channel
     if body.notify_customer and ticket.private_channel and ticket.private_channel_address:

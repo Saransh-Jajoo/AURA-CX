@@ -30,6 +30,11 @@ function getToken(): string | null {
   return localStorage.getItem("aura_token");
 }
 
+function getRefreshToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem("aura_refresh_token");
+}
+
 function headers(): HeadersInit {
   const h: HeadersInit = { "Content-Type": "application/json" };
   const token = getToken();
@@ -38,10 +43,31 @@ function headers(): HeadersInit {
 }
 
 async function request<T>(path: string, opts?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
+  let res = await fetch(`${API_BASE}${path}`, {
     ...opts,
     headers: { ...headers(), ...(opts?.headers || {}) },
   });
+  if (res.status === 401 && typeof window !== "undefined") {
+    const refreshToken = getRefreshToken();
+    if (refreshToken) {
+      const refresh = await fetch(`${API_BASE}/api/v1/auth/refresh`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refresh_token: refreshToken }),
+      });
+      if (refresh.ok) {
+        const data = await refresh.json();
+        localStorage.setItem("aura_token", data.access_token);
+        localStorage.setItem("aura_refresh_token", data.refresh_token);
+        localStorage.setItem("aura_user", JSON.stringify(data.user));
+        document.cookie = `aura_token=${data.access_token}; path=/; max-age=${8 * 3600}; SameSite=Lax`;
+        res = await fetch(`${API_BASE}${path}`, {
+          ...opts,
+          headers: { ...headers(), ...(opts?.headers || {}) },
+        });
+      }
+    }
+  }
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: "Request failed" }));
     throw new Error(err.detail || `HTTP ${res.status}`);
@@ -186,6 +212,25 @@ export async function createKBDocument(data: { title: string; body: string; cate
   });
 }
 
+export async function uploadKBDocument(file: File, data?: { category?: string; doc_type?: string }) {
+  const form = new FormData();
+  form.append("file", file);
+  const qs = new URLSearchParams();
+  if (data?.category) qs.set("category", data.category);
+  if (data?.doc_type) qs.set("doc_type", data.doc_type);
+  const token = getToken();
+  const res = await fetch(`${API_BASE}/api/v1/knowledge/upload${qs.toString() ? `?${qs}` : ""}`, {
+    method: "POST",
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    body: form,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "Upload failed" }));
+    throw new Error(err.detail || "Upload failed");
+  }
+  return res.json() as Promise<{ status: string; documents: import("./types").KBDocument[]; chunk_count: number }>;
+}
+
 export async function updateKBDocument(docId: string, data: { title?: string; body?: string; category?: string; status?: string }) {
   return request(`/api/v1/knowledge/${docId}`, {
     method: "PATCH",
@@ -207,6 +252,14 @@ export async function fetchKBGaps(resolved?: boolean) {
 // ── Settings / BYOI ─────────────────────────────────────────
 export async function fetchTenantSettings() {
   return request<{ tenant: import("./types").TenantSettings; byoi: import("./types").BYOIStatus }>("/api/v1/settings");
+}
+
+export async function fetchOnboardingStatus() {
+  return request<{
+    complete: boolean;
+    steps: Record<string, boolean>;
+    counts: Record<string, number>;
+  }>("/api/v1/settings/onboarding");
 }
 
 export async function updateTenantSettings(data: Record<string, unknown>) {

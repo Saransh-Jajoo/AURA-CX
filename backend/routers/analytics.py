@@ -17,8 +17,8 @@ from services.clustering import detect_clusters, shadow_tickets_from_clusters
 
 router = APIRouter()
 
-_ALLOWED_ROLES = ("tenant_admin", "executive", "qa_reviewer", "support_agent")
-_ADMIN_ROLES = ("tenant_admin", "executive", "qa_reviewer")
+_ALLOWED_ROLES = ("tenant_admin", "manager", "executive", "qa_reviewer", "support_agent", "read_only_analyst")
+_ADMIN_ROLES = ("tenant_admin", "manager", "executive", "qa_reviewer", "read_only_analyst")
 
 
 def _utcnow() -> datetime:

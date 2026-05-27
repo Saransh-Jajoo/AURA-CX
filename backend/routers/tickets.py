@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import settings
 from database import get_session
-from models import RLHFSignal, Ticket, User
+from models import RLHFSignal, Ticket, TicketTimelineEvent, User
 from security import assert_tenant, require_roles
 from services import ai_service
 from services.realtime import manager, ticket_to_dict
@@ -41,6 +41,64 @@ class HandoffRequest(BaseModel):
         return value
 
 
+class AssignRequest(BaseModel):
+    user_id: str
+    note: str | None = Field(default=None, max_length=1000)
+
+
+class StatusTransitionRequest(BaseModel):
+    status: str
+    note: str | None = Field(default=None, max_length=1000)
+
+    @field_validator("status")
+    @classmethod
+    def validate_status(cls, value: str) -> str:
+        value = value.lower().strip()
+        allowed = {"new", "in_progress", "awaiting_reply", "escalated", "resolved", "reopened", "closed"}
+        if value not in allowed:
+            raise ValueError(f"status must be one of {sorted(allowed)}")
+        return value
+
+
+def _timeline_item(event: TicketTimelineEvent) -> dict:
+    return {
+        "id": event.id,
+        "ticket_id": event.ticket_id,
+        "actor_id": event.actor_id,
+        "event_type": event.event_type,
+        "previous_status": event.previous_status,
+        "new_status": event.new_status,
+        "note": event.note,
+        "metadata": event.event_metadata,
+        "created_at": event.created_at.isoformat(),
+    }
+
+
+def _record_timeline(
+    session: AsyncSession,
+    *,
+    ticket: Ticket,
+    actor: User | None,
+    event_type: str,
+    previous_status: str | None = None,
+    new_status: str | None = None,
+    note: str | None = None,
+    metadata: dict | None = None,
+) -> None:
+    session.add(
+        TicketTimelineEvent(
+            ticket_id=ticket.id,
+            tenant_id=ticket.tenant_id,
+            actor_id=actor.id if actor else None,
+            event_type=event_type,
+            previous_status=previous_status,
+            new_status=new_status,
+            note=note,
+            event_metadata=metadata or {},
+        )
+    )
+
+
 async def _get_scoped_ticket(session: AsyncSession, user: User, ticket_id: str) -> Ticket:
     ticket = await session.get(Ticket, ticket_id)
     if ticket is None:
@@ -51,7 +109,7 @@ async def _get_scoped_ticket(session: AsyncSession, user: User, ticket_id: str) 
 
 @router.get("/tickets")
 async def get_tickets(
-    user: Annotated[User, Depends(require_roles("tenant_admin", "executive", "qa_reviewer", "support_agent"))],
+    user: Annotated[User, Depends(require_roles("tenant_admin", "manager", "executive", "qa_reviewer", "support_agent", "read_only_analyst"))],
     session: Annotated[AsyncSession, Depends(get_session)],
     tenant_id: str | None = None,
     limit: int = 100,
@@ -71,7 +129,7 @@ async def get_tickets(
 
 @router.get("/tickets/kpi")
 async def get_kpi_metrics(
-    user: Annotated[User, Depends(require_roles("tenant_admin", "executive", "qa_reviewer", "support_agent"))],
+    user: Annotated[User, Depends(require_roles("tenant_admin", "manager", "executive", "qa_reviewer", "support_agent", "read_only_analyst"))],
     session: Annotated[AsyncSession, Depends(get_session)],
     tenant_id: str | None = None,
 ):
@@ -106,7 +164,7 @@ async def get_kpi_metrics(
 
 @router.get("/tickets/hitl")
 async def get_hitl_queue(
-    user: Annotated[User, Depends(require_roles("tenant_admin", "qa_reviewer", "support_agent"))],
+    user: Annotated[User, Depends(require_roles("tenant_admin", "manager", "qa_reviewer", "support_agent"))],
     session: Annotated[AsyncSession, Depends(get_session)],
     tenant_id: str | None = None,
 ):
@@ -133,10 +191,27 @@ async def get_hitl_queue(
     return {"queue": queue, "total": len(queue)}
 
 
+@router.get("/tickets/{ticket_id}/timeline")
+async def get_ticket_timeline(
+    ticket_id: str,
+    user: Annotated[User, Depends(require_roles("tenant_admin", "manager", "support_agent", "qa_reviewer", "executive", "read_only_analyst"))],
+    session: Annotated[AsyncSession, Depends(get_session)],
+):
+    ticket = await _get_scoped_ticket(session, user, ticket_id)
+    events = (
+        await session.scalars(
+            select(TicketTimelineEvent)
+            .where(TicketTimelineEvent.tenant_id == ticket.tenant_id, TicketTimelineEvent.ticket_id == ticket.id)
+            .order_by(TicketTimelineEvent.created_at.asc())
+        )
+    ).all()
+    return {"ticket": ticket_to_dict(ticket), "events": [_timeline_item(event) for event in events]}
+
+
 @router.post("/tickets/{ticket_id}/draft")
 async def draft_for_ticket(
     ticket_id: str,
-    user: Annotated[User, Depends(require_roles("tenant_admin", "support_agent", "qa_reviewer"))],
+    user: Annotated[User, Depends(require_roles("tenant_admin", "manager", "support_agent", "qa_reviewer"))],
     session: Annotated[AsyncSession, Depends(get_session)],
 ):
     ticket = await _get_scoped_ticket(session, user, ticket_id)
@@ -144,6 +219,7 @@ async def draft_for_ticket(
     ticket.ai_draft = result["draft"]
     ticket.confidence = max(ticket.confidence, result["confidence"])
     ticket.rag_sources = result["rag_sources"]
+    _record_timeline(session, ticket=ticket, actor=user, event_type="ai_draft.generated", metadata={"confidence": result["confidence"], "source_count": len(result["rag_sources"])})
     await session.commit()
     await manager.broadcast(ticket.tenant_id, {"type": "ticket_updated", "ticket": ticket_to_dict(ticket)})
     return result
@@ -152,10 +228,11 @@ async def draft_for_ticket(
 @router.post("/tickets/{ticket_id}/approve")
 async def approve_ticket(
     ticket_id: str,
-    user: Annotated[User, Depends(require_roles("tenant_admin", "support_agent", "qa_reviewer"))],
+    user: Annotated[User, Depends(require_roles("tenant_admin", "manager", "support_agent", "qa_reviewer"))],
     session: Annotated[AsyncSession, Depends(get_session)],
 ):
     ticket = await _get_scoped_ticket(session, user, ticket_id)
+    previous = ticket.status
     ticket.status = "resolved"
     # FIX: actually record when the ticket was resolved (was missing before)
     ticket.resolved_at = datetime.now(timezone.utc)
@@ -170,6 +247,7 @@ async def approve_ticket(
                 original_draft=ticket.ai_draft,
             )
         )
+    _record_timeline(session, ticket=ticket, actor=user, event_type="hitl.approved", previous_status=previous, new_status=ticket.status)
     await session.commit()
     await manager.broadcast(ticket.tenant_id, {"type": "ticket_updated", "ticket": ticket_to_dict(ticket)})
     return {"ticket_id": ticket.id, "status": "approved", "action": "dispatched", "rlhf_signal": "positive"}
@@ -179,11 +257,12 @@ async def approve_ticket(
 async def edit_ticket(
     ticket_id: str,
     body: EditRequest,
-    user: Annotated[User, Depends(require_roles("tenant_admin", "support_agent", "qa_reviewer"))],
+    user: Annotated[User, Depends(require_roles("tenant_admin", "manager", "support_agent", "qa_reviewer"))],
     session: Annotated[AsyncSession, Depends(get_session)],
 ):
     ticket = await _get_scoped_ticket(session, user, ticket_id)
     original = body.original_draft or ticket.ai_draft or ""
+    previous = ticket.status
     ticket.ai_draft = body.edited_draft
     ticket.status = "resolved"
     # FIX: actually record resolution time
@@ -199,6 +278,7 @@ async def edit_ticket(
             edited_draft=body.edited_draft,
         )
     )
+    _record_timeline(session, ticket=ticket, actor=user, event_type="hitl.edited", previous_status=previous, new_status=ticket.status, metadata={"signal_type": body.signal_type})
     await session.commit()
     await manager.broadcast(ticket.tenant_id, {"type": "ticket_updated", "ticket": ticket_to_dict(ticket)})
     return await ai_service.record_rlhf_signal(
@@ -213,21 +293,80 @@ async def edit_ticket(
 @router.post("/tickets/{ticket_id}/escalate")
 async def escalate_ticket(
     ticket_id: str,
-    user: Annotated[User, Depends(require_roles("tenant_admin", "support_agent", "qa_reviewer"))],
+    user: Annotated[User, Depends(require_roles("tenant_admin", "manager", "support_agent", "qa_reviewer"))],
     session: Annotated[AsyncSession, Depends(get_session)],
 ):
     ticket = await _get_scoped_ticket(session, user, ticket_id)
+    previous = ticket.status
     ticket.status = "escalated"
+    ticket.sla_escalation_level += 1
+    _record_timeline(session, ticket=ticket, actor=user, event_type="ticket.escalated", previous_status=previous, new_status=ticket.status)
     await session.commit()
     await manager.broadcast(ticket.tenant_id, {"type": "ticket_updated", "ticket": ticket_to_dict(ticket)})
     return {"ticket_id": ticket.id, "status": "escalated", "action": "routed_to_senior"}
+
+
+@router.post("/tickets/{ticket_id}/assign")
+async def assign_ticket(
+    ticket_id: str,
+    body: AssignRequest,
+    user: Annotated[User, Depends(require_roles("tenant_admin", "manager"))],
+    session: Annotated[AsyncSession, Depends(get_session)],
+):
+    ticket = await _get_scoped_ticket(session, user, ticket_id)
+    assignee = await session.get(User, body.user_id)
+    if assignee is None or assignee.tenant_id != ticket.tenant_id or not assignee.active:
+        raise HTTPException(status_code=400, detail="Assignee is not an active user in this tenant")
+    ticket.assigned_to = assignee.id
+    if ticket.status == "new":
+        previous = ticket.status
+        ticket.status = "in_progress"
+    else:
+        previous = ticket.status
+    _record_timeline(
+        session,
+        ticket=ticket,
+        actor=user,
+        event_type="ticket.assigned",
+        previous_status=previous,
+        new_status=ticket.status,
+        note=body.note,
+        metadata={"assigned_to": assignee.id, "assigned_to_name": assignee.name},
+    )
+    await session.commit()
+    await manager.broadcast(ticket.tenant_id, {"type": "ticket_updated", "ticket": ticket_to_dict(ticket)})
+    return {"status": "assigned", "ticket": ticket_to_dict(ticket)}
+
+
+@router.post("/tickets/{ticket_id}/status")
+async def transition_ticket_status(
+    ticket_id: str,
+    body: StatusTransitionRequest,
+    user: Annotated[User, Depends(require_roles("tenant_admin", "manager", "support_agent", "qa_reviewer"))],
+    session: Annotated[AsyncSession, Depends(get_session)],
+):
+    ticket = await _get_scoped_ticket(session, user, ticket_id)
+    previous = ticket.status
+    if previous == "resolved" and body.status not in {"reopened", "closed"}:
+        raise HTTPException(status_code=400, detail="Resolved tickets can only be reopened or closed")
+    ticket.status = "in_progress" if body.status == "reopened" else body.status
+    if body.status == "reopened":
+        ticket.resolved_at = None
+        ticket.resolved_by = None
+    if body.status in {"resolved", "closed"}:
+        ticket.resolved_at = ticket.resolved_at or datetime.now(timezone.utc)
+        ticket.resolved_by = ticket.resolved_by or user.id
+    _record_timeline(session, ticket=ticket, actor=user, event_type=f"ticket.{body.status}", previous_status=previous, new_status=ticket.status, note=body.note)
+    await session.commit()
+    await manager.broadcast(ticket.tenant_id, {"type": "ticket_updated", "ticket": ticket_to_dict(ticket)})
+    return {"status": "updated", "ticket": ticket_to_dict(ticket)}
 
 
 @router.post("/tickets/{ticket_id}/handoff")
 async def create_handoff_link(
     ticket_id: str,
     body: HandoffRequest,
-    user: Annotated[User, Depends(require_roles("tenant_admin", "support_agent", "qa_reviewer"))],
+    user: Annotated[User, Depends(require_roles("tenant_admin", "manager", "support_agent", "qa_reviewer"))],
     session: Annotated[AsyncSession, Depends(get_session)],
 ):
     ticket = await _get_scoped_ticket(session, user, ticket_id)

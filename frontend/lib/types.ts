@@ -10,7 +10,7 @@ export interface Ticket {
   id: string;
   tenant_id?: string;
   profile_id?: string | null;
-  channel: "x" | "reddit" | "gmail" | "whatsapp";
+  channel: "x" | "reddit" | "gmail" | "whatsapp" | "web_form" | "voice";
   customer_name: string;
   customer_handle: string;
   message: string;
@@ -46,7 +46,7 @@ export interface KPIMetrics {
 // ── HITL Queue Item ──────────────────────────────────────────
 export interface HITLItem {
   id: string;
-  channel: "x" | "reddit" | "gmail" | "whatsapp";
+  channel: "x" | "reddit" | "gmail" | "whatsapp" | "web_form" | "voice";
   customer_name: string;
   customer_handle: string;
   message: string;
@@ -59,7 +59,7 @@ export interface HITLItem {
   ai_draft: string;
   auto_approvable: boolean;
   requires_senior_review: boolean;
-  rag_sources: string[];
+  rag_sources: Array<string | Record<string, unknown>>;
   timestamp: string;
 }
 
@@ -86,7 +86,7 @@ export interface GoldenProfile {
 }
 
 export interface ProfileInteraction {
-  channel: "x" | "reddit" | "gmail" | "whatsapp";
+  channel: "x" | "reddit" | "gmail" | "whatsapp" | "web_form" | "voice";
   handle: string;
   message: string;
   sentiment: string;
@@ -126,6 +126,9 @@ export interface TrendPoint {
   x_volume: number;
   reddit_volume: number;
   gmail_volume: number;
+  whatsapp_volume?: number;
+  web_form_volume?: number;
+  voice_volume?: number;
   critical_count: number;
   avg_sentiment: number;
 }
@@ -147,7 +150,7 @@ export interface AIDraftResponse {
   draft: string;
   confidence: number;
   auto_approvable: boolean;
-  rag_sources: string[];
+  rag_sources: Array<string | Record<string, unknown>>;
 }
 
 // ── RLHF Signal ──────────────────────────────────────────────

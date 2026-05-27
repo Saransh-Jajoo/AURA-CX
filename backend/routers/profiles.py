@@ -80,7 +80,7 @@ async def _profile_detail(session: AsyncSession, tenant_id: str, profile: Custom
 
 @router.get("/profiles")
 async def get_all_profiles(
-    user: Annotated[User, Depends(require_roles("tenant_admin", "executive", "qa_reviewer", "support_agent"))],
+    user: Annotated[User, Depends(require_roles("tenant_admin", "manager", "executive", "qa_reviewer", "support_agent", "read_only_analyst"))],
     session: Annotated[AsyncSession, Depends(get_session)],
     tenant_id: str | None = None,
 ):
@@ -103,7 +103,7 @@ async def get_all_profiles(
 @router.get("/profiles/{profile_id}")
 async def get_profile(
     profile_id: str,
-    user: Annotated[User, Depends(require_roles("tenant_admin", "executive", "qa_reviewer", "support_agent"))],
+    user: Annotated[User, Depends(require_roles("tenant_admin", "manager", "executive", "qa_reviewer", "support_agent", "read_only_analyst"))],
     session: Annotated[AsyncSession, Depends(get_session)],
 ):
     profile = await session.get(CustomerProfile, profile_id)
@@ -117,4 +117,3 @@ async def get_profile(
         raise HTTPException(status_code=404, detail="Profile not found")
     scoped_tenant = assert_tenant(user, profile.tenant_id)
     return await _profile_detail(session, scoped_tenant, profile)
-

@@ -6,7 +6,7 @@ voice, campaign, compliance, rate limiting, and social monitor settings.
 
 from __future__ import annotations
 
-from pydantic import field_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -36,6 +36,23 @@ class Settings(BaseSettings):
     GEMINI_API_KEY: str = ""
     GEMINI_MODEL: str = "gemini-1.5-pro-latest"
     GEMINI_EMBEDDING_MODEL: str = "text-embedding-004"
+    OPENAI_API_KEY: str = ""
+    OPENAI_MODEL: str = "gpt-4.1-mini"
+    ANTHROPIC_API_KEY: str = ""
+    ANTHROPIC_MODEL: str = "claude-3-5-sonnet-latest"
+    MISTRAL_API_KEY: str = ""
+    MISTRAL_MODEL: str = "mistral-large-latest"
+    OPENROUTER_API_KEY: str = ""
+    OPENROUTER_MODEL: str = "openai/gpt-4.1-mini"
+    OLLAMA_BASE_URL: str = "http://ollama:11434"
+    OLLAMA_MODEL: str = "llama3.1"
+    SELF_HOSTED_AI_BASE_URL: str = ""
+    SELF_HOSTED_AI_API_KEY: str = ""
+    SELF_HOSTED_AI_MODEL: str = ""
+    AI_PROVIDER: str = "gemini"
+    AI_FALLBACK_ORDER: str = "gemini,openai,anthropic,openrouter,mistral,ollama,self_hosted"
+    AI_TIMEOUT_SECONDS: float = 45.0
+    AI_MAX_RETRIES: int = 2
 
     # ── Vector Store ─────────────────────────────────────────
     VECTOR_PROVIDER: str = "pinecone"
@@ -111,9 +128,36 @@ class Settings(BaseSettings):
             raise ValueError("VECTOR_PROVIDER must be 'pinecone' or 'chroma'")
         return value
 
+    @field_validator("AI_PROVIDER")
+    @classmethod
+    def validate_ai_provider(cls, value: str) -> str:
+        value = value.lower().strip()
+        if value not in {"gemini", "openai", "anthropic", "mistral", "ollama", "openrouter", "self_hosted"}:
+            raise ValueError("AI_PROVIDER is not supported")
+        return value
+
     @property
     def supported_languages_list(self) -> list[str]:
         return [lang.strip() for lang in self.SUPPORTED_LANGUAGES.split(",") if lang.strip()]
+
+    @property
+    def ai_fallback_order_list(self) -> list[str]:
+        return [provider.strip().lower() for provider in self.AI_FALLBACK_ORDER.split(",") if provider.strip()]
+
+    @model_validator(mode="after")
+    def validate_production_security(self) -> "Settings":
+        if self.ENVIRONMENT.lower() == "production" and not self.USE_MOCK_DATA:
+            missing = [
+                name for name in ("SECRET_KEY", "WEBHOOK_SIGNING_SECRET", "ENCRYPTION_KEY", "REDIS_PASSWORD")
+                if not getattr(self, name)
+            ]
+            if missing:
+                raise ValueError(f"Missing required production security settings: {', '.join(missing)}")
+            if len(self.SECRET_KEY) < 32:
+                raise ValueError("SECRET_KEY must be at least 32 characters in production")
+            if self.BOOTSTRAP_ADMIN_PASSWORD in {"Admin@123", "ChangeMeNow123!", "password"}:
+                raise ValueError("BOOTSTRAP_ADMIN_PASSWORD must be changed for production")
+        return self
 
 
 settings = Settings()

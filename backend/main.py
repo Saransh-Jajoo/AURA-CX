@@ -22,6 +22,7 @@ from routers import (
 )
 from security import decode_token
 from services.realtime import manager, ticket_to_dict
+from services.ai_providers import provider_health
 
 
 @asynccontextmanager
@@ -85,6 +86,7 @@ app.include_router(resolution.router, prefix="/api/v1", tags=["Resolution"])
 
 @app.get("/health")
 async def health_check():
+    ai_health = await provider_health()
     return {
         "status": "operational",
         "service": "AURA-CX",
@@ -109,6 +111,7 @@ async def health_check():
             "social_monitor": "active" if settings.X_BEARER_TOKEN or settings.IMAP_HOST else "needs_configuration",
         },
         "providers": {
+            "ai": ai_health,
             "gemini": bool(settings.GEMINI_API_KEY),
             "vector_provider": settings.VECTOR_PROVIDER,
             "pinecone": bool(settings.PINECONE_API_KEY and settings.PINECONE_HOST),

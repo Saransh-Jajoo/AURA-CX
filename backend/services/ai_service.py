@@ -10,6 +10,7 @@ from typing import Any
 import httpx
 
 from config import settings
+from services.ai_providers import ProviderConfigurationError, generate_text
 from services.vector_store import query_vectors, upsert_vector
 
 logger = logging.getLogger("aura_cx.ai")
@@ -52,22 +53,11 @@ def _extract_json(text: str) -> dict[str, Any]:
 
 
 async def gemini_generate(prompt: str, *, response_json: bool = False) -> str:
-    _require_gemini()
-    generation_config = {"temperature": 0.2}
-    if response_json:
-        generation_config["response_mime_type"] = "application/json"
-    async with httpx.AsyncClient(timeout=45.0) as client:
-        response = await client.post(
-            f"https://generativelanguage.googleapis.com/v1beta/models/{settings.GEMINI_MODEL}:generateContent",
-            params={"key": settings.GEMINI_API_KEY},
-            json={
-                "contents": [{"role": "user", "parts": [{"text": prompt}]}],
-                "generationConfig": generation_config,
-            },
-        )
-        response.raise_for_status()
-        data = response.json()
-        return data["candidates"][0]["content"]["parts"][0]["text"]
+    try:
+        text, _provider = await generate_text(prompt, response_json=response_json)
+        return text
+    except ProviderConfigurationError as exc:
+        raise AIConfigurationError(str(exc)) from exc
 
 
 async def embed_text(text: str) -> list[float]:
@@ -88,7 +78,15 @@ async def embed_text(text: str) -> list[float]:
 
 
 async def classify_ticket(text: str, channel: str) -> dict:
-    if not settings.GEMINI_API_KEY or "mock" in settings.GEMINI_API_KEY.lower():
+    if settings.USE_MOCK_DATA or not any([
+        settings.GEMINI_API_KEY,
+        settings.OPENAI_API_KEY,
+        settings.ANTHROPIC_API_KEY,
+        settings.MISTRAL_API_KEY,
+        settings.OPENROUTER_API_KEY,
+        settings.OLLAMA_BASE_URL,
+        settings.SELF_HOSTED_AI_BASE_URL,
+    ]):
         text_lower = text.lower()
         intent = "Other"
         severity = "medium"
@@ -208,7 +206,15 @@ async def retrieve_rag_context(*, tenant_id: str, query_embedding: list[float], 
 
 
 async def generate_draft(*, tenant_id: str, ticket: dict) -> dict:
-    if not settings.GEMINI_API_KEY or "mock" in settings.GEMINI_API_KEY.lower():
+    if settings.USE_MOCK_DATA or not any([
+        settings.GEMINI_API_KEY,
+        settings.OPENAI_API_KEY,
+        settings.ANTHROPIC_API_KEY,
+        settings.MISTRAL_API_KEY,
+        settings.OPENROUTER_API_KEY,
+        settings.OLLAMA_BASE_URL,
+        settings.SELF_HOSTED_AI_BASE_URL,
+    ]):
         intent = ticket.get("intent", "general inquiry")
         customer = ticket.get("customer_name", "Valued Customer")
         draft = f"Hi {customer},\n\nThank you for reaching out to AURA-CX support. We have received your {intent.lower()} report and our engineering team is looking into it immediately. We will update you as soon as we have a resolution.\n\nBest regards,\nAURA-CX Copilot"
@@ -274,4 +280,3 @@ async def record_rlhf_signal(
         "pipeline_stage": "rlhf_feedback",
         "message": "Correction queued for tenant-scoped RLHF review.",
     }
-

@@ -6,9 +6,12 @@ Extends the existing /ai/knowledge endpoint without removing it.
 
 from __future__ import annotations
 
+import csv
+import io
+from datetime import datetime, timezone
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -41,6 +44,57 @@ class KBDocumentUpdate(BaseModel):
         return any(v is not None for v in [self.title, self.body, self.category, self.status])
 
 
+SUPPORTED_UPLOAD_TYPES = {".pdf", ".docx", ".txt", ".csv", ".md"}
+MAX_UPLOAD_BYTES = 8 * 1024 * 1024
+
+
+def _extension(filename: str) -> str:
+    return "." + filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+
+
+def _chunk_text(text: str, *, chunk_size: int = 2200, overlap: int = 250) -> list[str]:
+    normalized = "\n".join(line.strip() for line in text.splitlines() if line.strip())
+    if len(normalized) <= chunk_size:
+        return [normalized] if normalized else []
+    chunks: list[str] = []
+    start = 0
+    while start < len(normalized):
+        end = min(start + chunk_size, len(normalized))
+        boundary = normalized.rfind("\n", start, end)
+        if boundary <= start + 400:
+            boundary = end
+        chunk = normalized[start:boundary].strip()
+        if chunk:
+            chunks.append(chunk)
+        start = boundary if boundary >= len(normalized) else max(0, boundary - overlap)
+    return chunks
+
+
+def _extract_upload_text(filename: str, content: bytes) -> str:
+    ext = _extension(filename)
+    if ext in {".txt", ".md"}:
+        return content.decode("utf-8", errors="replace")
+    if ext == ".csv":
+        decoded = content.decode("utf-8", errors="replace")
+        rows = csv.reader(io.StringIO(decoded))
+        return "\n".join(" | ".join(cell.strip() for cell in row) for row in rows)
+    if ext == ".pdf":
+        try:
+            from pypdf import PdfReader
+        except ImportError as exc:
+            raise HTTPException(status_code=500, detail="PDF ingestion requires pypdf") from exc
+        reader = PdfReader(io.BytesIO(content))
+        return "\n".join((page.extract_text() or "").strip() for page in reader.pages)
+    if ext == ".docx":
+        try:
+            from docx import Document
+        except ImportError as exc:
+            raise HTTPException(status_code=500, detail="DOCX ingestion requires python-docx") from exc
+        document = Document(io.BytesIO(content))
+        return "\n".join(paragraph.text for paragraph in document.paragraphs)
+    raise HTTPException(status_code=400, detail="Unsupported file type")
+
+
 def _doc_summary(doc: KnowledgeDocument) -> dict:
     return {
         "id": doc.id,
@@ -61,7 +115,7 @@ def _doc_summary(doc: KnowledgeDocument) -> dict:
 
 @router.get("/knowledge")
 async def list_documents(
-    user: Annotated[User, Depends(require_roles("tenant_admin", "qa_reviewer"))],
+    user: Annotated[User, Depends(require_roles("tenant_admin", "manager", "qa_reviewer", "read_only_analyst"))],
     session: Annotated[AsyncSession, Depends(get_session)],
     tenant_id: str | None = None,
     category: str | None = None,
@@ -150,10 +204,89 @@ async def create_document(
     return {"status": "created", "document": _doc_summary(doc)}
 
 
+@router.post("/knowledge/upload")
+async def upload_document(
+    user: Annotated[User, Depends(require_roles("tenant_admin"))],
+    session: Annotated[AsyncSession, Depends(get_session)],
+    file: UploadFile = File(...),
+    category: str = "general",
+    doc_type: str = "policy",
+):
+    """Upload and index a PDF, DOCX, TXT, MD, or CSV knowledge document."""
+    tenant_id = assert_tenant(user, None)
+    filename = file.filename or "knowledge_upload"
+    ext = _extension(filename)
+    if ext not in SUPPORTED_UPLOAD_TYPES:
+        raise HTTPException(status_code=400, detail=f"Unsupported file type. Allowed: {sorted(SUPPORTED_UPLOAD_TYPES)}")
+    content = await file.read()
+    if not content or len(content) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=400, detail="File must be non-empty and at most 8 MB")
+
+    body = _extract_upload_text(filename, content)
+    chunks = _chunk_text(body)
+    if not chunks:
+        raise HTTPException(status_code=400, detail="No extractable text found in uploaded document")
+
+    parent_id: str | None = None
+    docs: list[KnowledgeDocument] = []
+    now = datetime.now(timezone.utc)
+    for index, chunk in enumerate(chunks, start=1):
+        try:
+            embedding = await embed_text(f"{filename}\n\n{chunk}")
+        except AIConfigurationError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        doc = KnowledgeDocument(
+            tenant_id=tenant_id,
+            title=filename if len(chunks) == 1 else f"{filename} chunk {index}",
+            body=chunk,
+            category=category,
+            doc_type=doc_type,
+            source_uri=f"upload://{filename}",
+            source_metadata={"filename": filename, "chunk_index": index, "chunk_total": len(chunks), "parent_id": parent_id},
+            embedding=embedding,
+            file_type=ext.lstrip("."),
+            file_size_bytes=len(content),
+            chunk_count=len(chunks),
+            created_by=user.id,
+            last_indexed_at=now,
+        )
+        session.add(doc)
+        await session.flush()
+        if parent_id is None:
+            parent_id = doc.id
+            doc.source_metadata = {**doc.source_metadata, "parent_id": parent_id}
+        await upsert_vector(
+            tenant_id=tenant_id,
+            bucket="knowledge",
+            vector_id=doc.id,
+            vector=embedding,
+            metadata={
+                "title": doc.title,
+                "source_uri": doc.source_uri or "",
+                "category": doc.category,
+                "body": doc.body[:4000],
+                "filename": filename,
+                "chunk_index": index,
+            },
+        )
+        docs.append(doc)
+
+    session.add(AuditEvent(
+        tenant_id=tenant_id,
+        user_id=user.id,
+        action="kb.upload",
+        resource_type="knowledge_document",
+        resource_id=parent_id,
+        details={"filename": filename, "chunks": len(chunks), "file_type": ext.lstrip(".")},
+    ))
+    await session.commit()
+    return {"status": "indexed", "documents": [_doc_summary(doc) for doc in docs], "chunk_count": len(docs)}
+
+
 @router.get("/knowledge/{doc_id}")
 async def get_document(
     doc_id: str,
-    user: Annotated[User, Depends(require_roles("tenant_admin", "qa_reviewer", "support_agent"))],
+    user: Annotated[User, Depends(require_roles("tenant_admin", "manager", "qa_reviewer", "support_agent", "read_only_analyst"))],
     session: Annotated[AsyncSession, Depends(get_session)],
 ):
     """Get a single knowledge base document with full body."""
@@ -257,7 +390,7 @@ async def archive_document(
 
 @router.get("/knowledge/gaps/analytics")
 async def get_kb_gaps(
-    user: Annotated[User, Depends(require_roles("tenant_admin", "qa_reviewer"))],
+    user: Annotated[User, Depends(require_roles("tenant_admin", "manager", "qa_reviewer", "read_only_analyst"))],
     session: Annotated[AsyncSession, Depends(get_session)],
     tenant_id: str | None = None,
     resolved: bool | None = None,

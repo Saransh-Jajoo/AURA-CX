@@ -1,21 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
 
-type UserRole = "super_admin" | "tenant_admin" | "executive" | "qa_reviewer" | "support_agent";
+type UserRole = "super_admin" | "tenant_admin" | "executive" | "manager" | "support_agent" | "qa_reviewer" | "read_only_analyst";
 
 const ROLE_ROUTES: Record<UserRole, string[]> = {
   super_admin: ["/dashboard", "/dashboard/admin", "/dashboard/analytics", "/dashboard/profiles", "/dashboard/hitl", "/dashboard/shadow-tickets", "/dashboard/qa-review", "/dashboard/integrations", "/dashboard/subscriptions", "/dashboard/executive", "/dashboard/knowledge", "/dashboard/team", "/dashboard/settings", "/dashboard/voice", "/dashboard/compliance"],
   tenant_admin: ["/dashboard", "/dashboard/admin", "/dashboard/analytics", "/dashboard/profiles", "/dashboard/hitl", "/dashboard/shadow-tickets", "/dashboard/qa-review", "/dashboard/integrations", "/dashboard/subscriptions", "/dashboard/executive", "/dashboard/knowledge", "/dashboard/team", "/dashboard/settings", "/dashboard/voice", "/dashboard/compliance"],
   executive: ["/dashboard", "/dashboard/executive", "/dashboard/analytics", "/dashboard/subscriptions", "/dashboard/profiles", "/dashboard/compliance"],
+  manager: ["/dashboard", "/dashboard/analytics", "/dashboard/profiles", "/dashboard/hitl", "/dashboard/shadow-tickets", "/dashboard/qa-review", "/dashboard/knowledge", "/dashboard/team", "/dashboard/voice", "/dashboard/compliance"],
   qa_reviewer: ["/dashboard", "/dashboard/qa-review", "/dashboard/hitl", "/dashboard/analytics", "/dashboard/profiles", "/dashboard/knowledge", "/dashboard/voice"],
   support_agent: ["/dashboard", "/dashboard/profiles", "/dashboard/hitl", "/dashboard/knowledge", "/dashboard/voice"],
+  read_only_analyst: ["/dashboard", "/dashboard/analytics", "/dashboard/profiles", "/dashboard/knowledge", "/dashboard/compliance"],
 };
 
 const ROLE_DEFAULT_ROUTE: Record<UserRole, string> = {
   super_admin: "/dashboard/admin",
   tenant_admin: "/dashboard/admin",
   executive: "/dashboard/executive",
+  manager: "/dashboard",
   qa_reviewer: "/dashboard/qa-review",
   support_agent: "/dashboard",
+  read_only_analyst: "/dashboard/analytics",
 };
 
 const PUBLIC_PATHS = ["/login", "/api", "/_next", "/favicon.ico", "/logo"];

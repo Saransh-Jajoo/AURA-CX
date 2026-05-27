@@ -16,7 +16,7 @@ from security import assert_tenant, hash_password, require_roles, verify_passwor
 
 router = APIRouter()
 
-ALLOWED_PLATFORMS = {"x", "reddit", "gmail"}
+ALLOWED_PLATFORMS = {"x", "reddit", "gmail", "whatsapp", "web_form"}
 
 
 class IntegrationSourceIn(BaseModel):
@@ -31,7 +31,7 @@ class IntegrationSourceIn(BaseModel):
     def validate_platform(cls, value: str) -> str:
         value = value.lower().strip()
         if value not in ALLOWED_PLATFORMS:
-            raise ValueError("platform must be x, reddit, or gmail")
+            raise ValueError("platform must be x, reddit, gmail, whatsapp, or web_form")
         return value
 
 
@@ -148,4 +148,3 @@ async def verify_webhook_source(session: AsyncSession, tenant_id: str, platform:
         if source.webhook_secret_hash and verify_password(secret, source.webhook_secret_hash):
             return list(sources)
     raise HTTPException(status_code=401, detail="Invalid webhook secret")
-

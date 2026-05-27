@@ -59,6 +59,15 @@ class TenantConfig(Base):
     # AI Provider keys (stored encrypted)
     gemini_api_key_enc: Mapped[str | None] = mapped_column(Text)
     openai_api_key_enc: Mapped[str | None] = mapped_column(Text)
+    anthropic_api_key_enc: Mapped[str | None] = mapped_column(Text)
+    mistral_api_key_enc: Mapped[str | None] = mapped_column(Text)
+    openrouter_api_key_enc: Mapped[str | None] = mapped_column(Text)
+    ollama_base_url: Mapped[str | None] = mapped_column(String(512))
+    self_hosted_base_url: Mapped[str | None] = mapped_column(String(512))
+    self_hosted_api_key_enc: Mapped[str | None] = mapped_column(Text)
+    ai_provider: Mapped[str] = mapped_column(String(32), default="gemini", nullable=False)
+    ai_model: Mapped[str | None] = mapped_column(String(128))
+    ai_fallback_order: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
     # Vector DB
     pinecone_api_key_enc: Mapped[str | None] = mapped_column(Text)
     pinecone_host: Mapped[str | None] = mapped_column(String(512))
@@ -145,6 +154,33 @@ class TeamInvitation(Base):
 
 
 # ── Integration Source ────────────────────────────────────────
+class RefreshTokenSession(Base):
+    """Revocable refresh-token session for rotation and replay detection."""
+    __tablename__ = "refresh_token_sessions"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True, default=lambda: new_id("rts"))
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
+    tenant_id: Mapped[str | None] = mapped_column(String(64), index=True)
+    token_hash: Mapped[str] = mapped_column(String(128), unique=True, index=True, nullable=False)
+    user_agent: Mapped[str | None] = mapped_column(String(512))
+    ip_address: Mapped[str | None] = mapped_column(String(64))
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+
+
+class PasswordResetToken(Base):
+    """Short-lived password reset token, stored as a hash only."""
+    __tablename__ = "password_reset_tokens"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True, default=lambda: new_id("prt"))
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
+    token_hash: Mapped[str] = mapped_column(String(128), unique=True, index=True, nullable=False)
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+
+
 class IntegrationSource(Base):
     __tablename__ = "integration_sources"
     __table_args__ = (UniqueConstraint("tenant_id", "platform", "identifier", name="uq_tenant_platform_identifier"),)
@@ -432,6 +468,22 @@ class SocialMention(Base):
 
 
 # ── Ticket Message (private resolution thread) ──────────────────
+class TicketTimelineEvent(Base):
+    """Immutable operational timeline for complaint lifecycle events."""
+    __tablename__ = "ticket_timeline_events"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True, default=lambda: new_id("tle"))
+    ticket_id: Mapped[str] = mapped_column(ForeignKey("tickets.id", ondelete="CASCADE"), index=True, nullable=False)
+    tenant_id: Mapped[str] = mapped_column(String(64), index=True, nullable=False)
+    actor_id: Mapped[str | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    event_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    previous_status: Mapped[str | None] = mapped_column(String(64))
+    new_status: Mapped[str | None] = mapped_column(String(64))
+    note: Mapped[str | None] = mapped_column(Text)
+    event_metadata: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True, nullable=False)
+
+
 class TicketMessage(Base):
     """Private threaded messages between agent and customer for a single ticket."""
     __tablename__ = "ticket_messages"

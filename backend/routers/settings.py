@@ -6,11 +6,13 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_session
-from models import AuditEvent, Tenant, TenantConfig, User
+from models import AuditEvent, IntegrationSource, KnowledgeDocument, TeamInvitation, Tenant, TenantConfig, User
 from security import assert_tenant, require_roles
+from services.ai_providers import provider_health
 from services.encryption import encrypt_value, decrypt_value
 
 router = APIRouter()
@@ -20,6 +22,15 @@ class BYOIConfigUpdate(BaseModel):
     """BYOI credential update. Empty strings clear the value."""
     gemini_api_key: str | None = None
     openai_api_key: str | None = None
+    anthropic_api_key: str | None = None
+    mistral_api_key: str | None = None
+    openrouter_api_key: str | None = None
+    ollama_base_url: str | None = None
+    self_hosted_base_url: str | None = None
+    self_hosted_api_key: str | None = None
+    ai_provider: str | None = None
+    ai_model: str | None = None
+    ai_fallback_order: list[str] | None = None
     pinecone_api_key: str | None = None
     pinecone_host: str | None = None
     chromadb_host: str | None = None
@@ -87,6 +98,11 @@ def _config_status(config: TenantConfig | None) -> dict:
         "services": {
             "gemini": {"active": bool(config.gemini_api_key_enc), "masked_key": _mask_credential(decrypt_value(config.gemini_api_key_enc or ""))},
             "openai": {"active": bool(config.openai_api_key_enc), "masked_key": _mask_credential(decrypt_value(config.openai_api_key_enc or ""))},
+            "anthropic": {"active": bool(config.anthropic_api_key_enc), "masked_key": _mask_credential(decrypt_value(config.anthropic_api_key_enc or ""))},
+            "mistral": {"active": bool(config.mistral_api_key_enc), "masked_key": _mask_credential(decrypt_value(config.mistral_api_key_enc or ""))},
+            "openrouter": {"active": bool(config.openrouter_api_key_enc), "masked_key": _mask_credential(decrypt_value(config.openrouter_api_key_enc or ""))},
+            "ollama": {"active": bool(config.ollama_base_url), "host": config.ollama_base_url or ""},
+            "self_hosted": {"active": bool(config.self_hosted_base_url), "host": config.self_hosted_base_url or ""},
             "pinecone": {"active": bool(config.pinecone_api_key_enc), "host": config.pinecone_host or ""},
             "chromadb": {"active": bool(config.chromadb_host), "host": config.chromadb_host or "", "port": config.chromadb_port},
             "smtp": {"active": bool(config.smtp_host), "host": config.smtp_host or ""},
@@ -96,6 +112,9 @@ def _config_status(config: TenantConfig | None) -> dict:
         },
         "brand_tone_set": bool(config.brand_tone),
         "brand_examples_count": len(config.brand_examples or []),
+        "active_ai_provider": config.ai_provider,
+        "ai_model": config.ai_model,
+        "ai_fallback_order": config.ai_fallback_order or [],
         "updated_at": config.updated_at.isoformat(),
     }
 
@@ -208,6 +227,40 @@ async def update_tenant_settings(
     return {"status": "updated"}
 
 
+@router.get("/settings/onboarding")
+async def get_onboarding_status(
+    user: Annotated[User, Depends(require_roles("tenant_admin"))],
+    session: Annotated[AsyncSession, Depends(get_session)],
+):
+    tenant_id = assert_tenant(user, None)
+    tenant = await session.get(Tenant, tenant_id)
+    if tenant is None:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+    config = tenant.config
+    kb_count = await session.scalar(select(func.count(KnowledgeDocument.id)).where(KnowledgeDocument.tenant_id == tenant_id, KnowledgeDocument.status == "active")) or 0
+    channel_count = await session.scalar(select(func.count(IntegrationSource.id)).where(IntegrationSource.tenant_id == tenant_id, IntegrationSource.active.is_(True))) or 0
+    invite_count = await session.scalar(select(func.count(TeamInvitation.id)).where(TeamInvitation.tenant_id == tenant_id)) or 0
+    team_count = await session.scalar(select(func.count(User.id)).where(User.tenant_id == tenant_id, User.active.is_(True))) or 0
+    steps = {
+        "organization": bool(tenant.name and tenant.domain),
+        "workspace": bool(tenant.industry and tenant.default_language),
+        "ai_provider": bool(config and (config.gemini_api_key_enc or config.openai_api_key_enc or config.anthropic_api_key_enc or config.ollama_base_url)),
+        "knowledge_base": kb_count > 0,
+        "complaint_channels": channel_count > 0,
+        "sla_policies": bool(tenant.sla_config),
+        "team_members": team_count > 1 or invite_count > 0,
+    }
+    complete = all(steps.values())
+    if tenant.onboarding_complete != complete:
+        tenant.onboarding_complete = complete
+        await session.commit()
+    return {
+        "complete": complete,
+        "steps": steps,
+        "counts": {"knowledge_documents": kb_count, "channels": channel_count, "team_members": team_count, "invitations": invite_count},
+    }
+
+
 @router.put("/settings/byoi")
 async def update_byoi_config(
     body: BYOIConfigUpdate,
@@ -236,6 +289,35 @@ async def update_byoi_config(
     if body.openai_api_key is not None:
         config.openai_api_key_enc = encrypt_value(body.openai_api_key) if body.openai_api_key else None
         changed_services.append("openai")
+    if body.anthropic_api_key is not None:
+        config.anthropic_api_key_enc = encrypt_value(body.anthropic_api_key) if body.anthropic_api_key else None
+        changed_services.append("anthropic")
+    if body.mistral_api_key is not None:
+        config.mistral_api_key_enc = encrypt_value(body.mistral_api_key) if body.mistral_api_key else None
+        changed_services.append("mistral")
+    if body.openrouter_api_key is not None:
+        config.openrouter_api_key_enc = encrypt_value(body.openrouter_api_key) if body.openrouter_api_key else None
+        changed_services.append("openrouter")
+    if body.ollama_base_url is not None:
+        config.ollama_base_url = body.ollama_base_url or None
+        changed_services.append("ollama")
+    if body.self_hosted_base_url is not None:
+        config.self_hosted_base_url = body.self_hosted_base_url or None
+        changed_services.append("self_hosted")
+    if body.self_hosted_api_key is not None:
+        config.self_hosted_api_key_enc = encrypt_value(body.self_hosted_api_key) if body.self_hosted_api_key else None
+    if body.ai_provider is not None:
+        provider = body.ai_provider.lower().strip()
+        if provider not in {"gemini", "openai", "anthropic", "mistral", "ollama", "openrouter", "self_hosted"}:
+            raise HTTPException(status_code=400, detail="Unsupported AI provider")
+        config.ai_provider = provider
+    if body.ai_model is not None:
+        config.ai_model = body.ai_model or None
+    if body.ai_fallback_order is not None:
+        unsupported = set(body.ai_fallback_order) - {"gemini", "openai", "anthropic", "mistral", "ollama", "openrouter", "self_hosted"}
+        if unsupported:
+            raise HTTPException(status_code=400, detail=f"Unsupported fallback providers: {sorted(unsupported)}")
+        config.ai_fallback_order = body.ai_fallback_order
     if body.pinecone_api_key is not None:
         config.pinecone_api_key_enc = encrypt_value(body.pinecone_api_key) if body.pinecone_api_key else None
         changed_services.append("pinecone")
@@ -299,6 +381,15 @@ async def get_platform_connections(
     if tenant is None:
         raise HTTPException(status_code=404, detail="Tenant not found")
     return {"platforms": _platform_status(tenant.config)}
+
+
+@router.get("/settings/ai-providers/health")
+async def get_ai_provider_health(
+    user: Annotated[User, Depends(require_roles("tenant_admin"))],
+):
+    """Return provider readiness without exposing credentials."""
+    assert_tenant(user, None)
+    return {"providers": await provider_health()}
 
 
 @router.put("/settings/platforms")
