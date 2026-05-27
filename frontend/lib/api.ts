@@ -21,7 +21,9 @@ import type {
   TrendPoint,
 } from "./types";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const API_BASE = typeof window !== "undefined"
+  ? (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" ? "http://localhost:8000" : "")
+  : "http://backend:8000";
 
 function getToken(): string | null {
   if (typeof window === "undefined") return null;
