@@ -34,6 +34,21 @@ interface SourceField {
   hint?: string;
 }
 
+interface SetupGuideStep {
+  step: number;
+  title: string;
+  desc: string;
+  link?: string;
+}
+
+type PlatformKey = "x" | "reddit" | "gmail" | "threads";
+
+type IntegrationTab = {
+  id: "connect" | "monitor";
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+};
+
 // ── Platform Metadata ─────────────────────────────────────────
 const PLATFORM_META: Record<string, {
   icon: React.ComponentType<{ className?: string }>;
@@ -84,7 +99,7 @@ const PLATFORM_META: Record<string, {
 };
 
 // ── Guide Steps ────────────────────────────────────────────────
-const SETUP_GUIDES = {
+const SETUP_GUIDES: Record<PlatformKey, SetupGuideStep[]> = {
   x: [
     { step: 1, title: "Go to developer.twitter.com", desc: "Sign in with your X account and open the Developer Portal.", link: "https://developer.twitter.com/en/portal/dashboard" },
     { step: 2, title: "Create a new App", desc: "Click 'Create App', give it a name, and choose 'Read' permissions." },
@@ -698,10 +713,10 @@ export default function IntegrationsPage() {
 
       {/* Tabs */}
       <div className="flex gap-1 p-1 rounded-[var(--radius-md)] bg-[var(--bg-elevated)] border border-[var(--border-subtle)] w-fit">
-        {[
-          { id: "connect" as const, label: "Connect Platforms", icon: Link2 },
-          { id: "monitor" as const, label: "Monitor Sources", icon: MessageSquare },
-        ].map((t) => {
+        {([
+          { id: "connect", label: "Connect Platforms", icon: Link2 },
+          { id: "monitor", label: "Monitor Sources", icon: MessageSquare },
+        ] satisfies IntegrationTab[]).map((t) => {
           const TIcon = t.icon;
           return (
             <button

@@ -6,11 +6,13 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field, field_validator
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_session
-from models import KnowledgeDocument, RLHFSignal, User
+from models import KnowledgeDocument, RLHFSignal, TenantConfig, User
 from security import assert_tenant, require_roles
+from services.ai_providers import tenant_provider_configs
 from services.ai_service import AIConfigurationError, embed_text, generate_draft, record_rlhf_signal
 from services.vector_store import upsert_vector
 
@@ -62,8 +64,10 @@ class KnowledgeDocumentIn(BaseModel):
 async def create_ai_draft(
     req: DraftRequest,
     user: Annotated[User, Depends(require_roles("tenant_admin", "support_agent", "qa_reviewer"))],
+    session: Annotated[AsyncSession, Depends(get_session)],
 ):
     tenant_id = assert_tenant(user, req.tenant_id)
+    config = await session.scalar(select(TenantConfig).where(TenantConfig.tenant_id == tenant_id))
     try:
         return await generate_draft(
             tenant_id=tenant_id,
@@ -73,6 +77,10 @@ async def create_ai_draft(
                 "message": req.message,
                 "product": req.product,
             },
+            provider_configs=tenant_provider_configs(config),
+            preferred_provider=config.ai_provider if config else None,
+            fallback_order=config.ai_fallback_order if config else None,
+            brand_tone=config.brand_tone if config else None,
         )
     except AIConfigurationError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
@@ -136,4 +144,3 @@ async def upsert_knowledge_document(
         metadata={"title": doc.title, "source_uri": doc.source_uri or "", "body": doc.body[:4000]},
     )
     return {"document": {"id": doc.id, "title": doc.title, "source_uri": doc.source_uri}}
-

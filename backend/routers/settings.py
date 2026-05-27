@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from database import get_session
 from models import AuditEvent, IntegrationSource, KnowledgeDocument, TeamInvitation, Tenant, TenantConfig, User
 from security import assert_tenant, require_roles
-from services.ai_providers import provider_health
+from services.ai_providers import provider_health, tenant_provider_configs
 from services.encryption import encrypt_value, decrypt_value
 
 router = APIRouter()
@@ -386,10 +386,12 @@ async def get_platform_connections(
 @router.get("/settings/ai-providers/health")
 async def get_ai_provider_health(
     user: Annotated[User, Depends(require_roles("tenant_admin"))],
+    session: Annotated[AsyncSession, Depends(get_session)],
 ):
     """Return provider readiness without exposing credentials."""
-    assert_tenant(user, None)
-    return {"providers": await provider_health()}
+    tenant_id = assert_tenant(user, None)
+    config = await session.scalar(select(TenantConfig).where(TenantConfig.tenant_id == tenant_id))
+    return {"providers": await provider_health(tenant_provider_configs(config))}
 
 
 @router.put("/settings/platforms")

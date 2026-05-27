@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import secrets
+import re
 from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
@@ -12,6 +13,7 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_session
+from config import settings
 from models import AuditEvent, TeamInvitation, User
 from security import ROLES, assert_tenant, hash_password, require_roles
 
@@ -35,6 +37,20 @@ class AcceptInviteRequest(BaseModel):
     token: str
     name: str = Field(min_length=1, max_length=255)
     password: str = Field(min_length=12)
+
+    @field_validator("password")
+    @classmethod
+    def validate_password_strength(cls, value: str) -> str:
+        checks = {
+            "uppercase": r"[A-Z]",
+            "lowercase": r"[a-z]",
+            "number": r"\d",
+            "symbol": r"[^A-Za-z0-9]",
+        }
+        missing = [name for name, pattern in checks.items() if not re.search(pattern, value)]
+        if missing:
+            raise ValueError(f"Password must include: {', '.join(missing)}")
+        return value
 
 
 class UpdateUserRequest(BaseModel):
@@ -131,13 +147,15 @@ async def invite_member(
     ))
 
     await session.commit()
-    return {
+    response = {
         "status": "invited",
         "invitation_id": invitation.id,
-        "token": invitation.token,
         "expires_at": invitation.expires_at.isoformat(),
-        "invite_link": f"/onboarding/accept?token={invitation.token}",
+        "invite_link": f"{settings.FRONTEND_URL.rstrip('/')}/onboarding/accept?token={invitation.token}",
     }
+    if settings.ENVIRONMENT != "production":
+        response["token"] = invitation.token
+    return response
 
 
 @router.get("/team/invitations")
@@ -162,7 +180,7 @@ async def list_invitations(
                 "email": inv.email,
                 "role": inv.role,
                 "accepted": inv.accepted,
-                "token": inv.token if not inv.accepted else None,
+                "token": inv.token if settings.ENVIRONMENT != "production" and not inv.accepted else None,
                 "expires_at": inv.expires_at.isoformat(),
                 "created_at": inv.created_at.isoformat(),
             }

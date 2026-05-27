@@ -14,8 +14,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import settings
 from database import get_session
-from models import RLHFSignal, Ticket, TicketTimelineEvent, User
+from models import RLHFSignal, Ticket, TenantConfig, TicketTimelineEvent, User
 from security import assert_tenant, require_roles
+from services.ai_providers import tenant_provider_configs
 from services import ai_service
 from services.realtime import manager, ticket_to_dict
 
@@ -215,7 +216,15 @@ async def draft_for_ticket(
     session: Annotated[AsyncSession, Depends(get_session)],
 ):
     ticket = await _get_scoped_ticket(session, user, ticket_id)
-    result = await ai_service.generate_draft(tenant_id=ticket.tenant_id, ticket=ticket_to_dict(ticket))
+    config = await session.scalar(select(TenantConfig).where(TenantConfig.tenant_id == ticket.tenant_id))
+    result = await ai_service.generate_draft(
+        tenant_id=ticket.tenant_id,
+        ticket=ticket_to_dict(ticket),
+        provider_configs=tenant_provider_configs(config),
+        preferred_provider=config.ai_provider if config else None,
+        fallback_order=config.ai_fallback_order if config else None,
+        brand_tone=config.brand_tone if config else None,
+    )
     ticket.ai_draft = result["draft"]
     ticket.confidence = max(ticket.confidence, result["confidence"])
     ticket.rag_sources = result["rag_sources"]

@@ -10,7 +10,7 @@ from typing import Any
 import httpx
 
 from config import settings
-from services.ai_providers import ProviderConfigurationError, generate_text
+from services.ai_providers import ProviderConfig, ProviderConfigurationError, generate_text
 from services.vector_store import query_vectors, upsert_vector
 
 logger = logging.getLogger("aura_cx.ai")
@@ -52,9 +52,22 @@ def _extract_json(text: str) -> dict[str, Any]:
     return json.loads(text)
 
 
-async def gemini_generate(prompt: str, *, response_json: bool = False) -> str:
+async def gemini_generate(
+    prompt: str,
+    *,
+    response_json: bool = False,
+    provider_configs: dict[str, ProviderConfig] | None = None,
+    preferred_provider: str | None = None,
+    fallback_order: list[str] | None = None,
+) -> str:
     try:
-        text, _provider = await generate_text(prompt, response_json=response_json)
+        text, _provider = await generate_text(
+            prompt,
+            response_json=response_json,
+            preferred_provider=preferred_provider,
+            fallback_order=fallback_order,
+            provider_configs=provider_configs,
+        )
         return text
     except ProviderConfigurationError as exc:
         raise AIConfigurationError(str(exc)) from exc
@@ -205,8 +218,16 @@ async def retrieve_rag_context(*, tenant_id: str, query_embedding: list[float], 
     ]
 
 
-async def generate_draft(*, tenant_id: str, ticket: dict) -> dict:
-    if settings.USE_MOCK_DATA or not any([
+async def generate_draft(
+    *,
+    tenant_id: str,
+    ticket: dict,
+    provider_configs: dict[str, ProviderConfig] | None = None,
+    preferred_provider: str | None = None,
+    fallback_order: list[str] | None = None,
+    brand_tone: str | None = None,
+) -> dict:
+    configured = bool(provider_configs) or any([
         settings.GEMINI_API_KEY,
         settings.OPENAI_API_KEY,
         settings.ANTHROPIC_API_KEY,
@@ -214,14 +235,16 @@ async def generate_draft(*, tenant_id: str, ticket: dict) -> dict:
         settings.OPENROUTER_API_KEY,
         settings.OLLAMA_BASE_URL,
         settings.SELF_HOSTED_AI_BASE_URL,
-    ]):
+    ])
+    if settings.USE_MOCK_DATA or not configured:
         intent = ticket.get("intent", "general inquiry")
         customer = ticket.get("customer_name", "Valued Customer")
         draft = f"Hi {customer},\n\nThank you for reaching out to AURA-CX support. We have received your {intent.lower()} report and our engineering team is looking into it immediately. We will update you as soon as we have a resolution.\n\nBest regards,\nAURA-CX Copilot"
         return {
             "draft": draft,
             "confidence": 0.9,
-            "auto_approvable": True,
+            "auto_approvable": False,
+            "requires_human_approval": True,
             "rag_sources": [],
         }
 
@@ -236,6 +259,11 @@ You are AURA-CX, an expert enterprise support copilot.
 Use only tenant knowledge context below. If context is insufficient, say what you need from the agent.
 Draft a concise, empathetic response suitable for the customer channel.
 Do not reveal internal policy IDs unless they help the agent verify the source.
+This system is human-in-the-loop: never claim the response has been sent, approved, resolved, or executed.
+If tenant knowledge is missing or weak, set confidence to 0.45 or lower and needs_human_detail to true.
+
+Tenant tone guidance:
+{_sanitize_user_input(brand_tone or "Professional, concise, accountable, and empathetic.")}
 
 Tenant knowledge:
 {context or "No matching tenant knowledge documents were retrieved."}
@@ -254,12 +282,22 @@ Return strict JSON:
   "needs_human_detail": true
 }}
 """
-    result = _extract_json(await gemini_generate(prompt, response_json=True))
+    result = _extract_json(await gemini_generate(
+        prompt,
+        response_json=True,
+        provider_configs=provider_configs,
+        preferred_provider=preferred_provider,
+        fallback_order=fallback_order,
+    ))
     confidence = float(result.get("confidence") or 0)
+    if not context_docs:
+        confidence = min(confidence, 0.45)
     return {
         "draft": str(result.get("draft") or "").strip(),
         "confidence": max(0.0, min(1.0, confidence)),
-        "auto_approvable": confidence >= settings.DRAFT_CONFIDENCE_THRESHOLD and not bool(result.get("needs_human_detail")),
+        "auto_approvable": False,
+        "requires_human_approval": True,
+        "needs_human_detail": bool(result.get("needs_human_detail")) or not context_docs,
         "rag_sources": context_docs,
     }
 

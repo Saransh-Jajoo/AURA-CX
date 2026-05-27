@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import secrets
+import re
 from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.security import OAuth2PasswordRequestForm
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -46,12 +47,26 @@ class LogoutRequest(BaseModel):
 
 
 class PasswordResetRequest(BaseModel):
-    email: str
+    email: EmailStr
 
 
 class PasswordResetConfirm(BaseModel):
     token: str
     new_password: str
+
+
+def _validate_password_strength(password: str) -> None:
+    if len(password) < 12:
+        raise HTTPException(status_code=400, detail="Password must be at least 12 characters")
+    checks = {
+        "uppercase": r"[A-Z]",
+        "lowercase": r"[a-z]",
+        "number": r"\d",
+        "symbol": r"[^A-Za-z0-9]",
+    }
+    missing = [name for name, pattern in checks.items() if not re.search(pattern, password)]
+    if missing:
+        raise HTTPException(status_code=400, detail=f"Password must include: {', '.join(missing)}")
 
 
 def _client_context(request: Request) -> tuple[str | None, str | None]:
@@ -181,8 +196,7 @@ async def confirm_password_reset(
     body: PasswordResetConfirm,
     session: Annotated[AsyncSession, Depends(get_session)],
 ):
-    if len(body.new_password) < 12:
-        raise HTTPException(status_code=400, detail="Password must be at least 12 characters")
+    _validate_password_strength(body.new_password)
     reset = await session.scalar(select(PasswordResetToken).where(PasswordResetToken.token_hash == hash_token(body.token)))
     now = datetime.now(timezone.utc)
     if reset is None or reset.used_at is not None or reset.expires_at <= now:

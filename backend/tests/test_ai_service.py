@@ -28,3 +28,5 @@ def test_generate_draft_returns_template_in_mock_mode():
     assert isinstance(out, dict)
     assert "draft" in out and "Alice" in out["draft"]
     assert "confidence" in out
+    assert out["auto_approvable"] is False
+    assert out["requires_human_approval"] is True

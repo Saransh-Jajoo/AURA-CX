@@ -134,7 +134,10 @@ def reindex_kb_document(document_id: str, tenant_id: str):
             from models import KnowledgeDocument
             from datetime import datetime, timezone
 
-            stmt = select(KnowledgeDocument).where(KnowledgeDocument.id == document_id)
+            stmt = select(KnowledgeDocument).where(
+                KnowledgeDocument.id == document_id,
+                KnowledgeDocument.tenant_id == tenant_id,
+            )
             result = await db.execute(stmt)
             doc = result.scalar_one_or_none()
 
@@ -162,7 +165,10 @@ def process_voice_transcript(call_id: str, tenant_id: str):
             from sqlalchemy import select
             from models import CallRecording
 
-            stmt = select(CallRecording).where(CallRecording.id == call_id)
+            stmt = select(CallRecording).where(
+                CallRecording.id == call_id,
+                CallRecording.tenant_id == tenant_id,
+            )
             result = await db.execute(stmt)
             call = result.scalar_one_or_none()
 

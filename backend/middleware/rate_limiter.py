@@ -11,11 +11,13 @@ import logging
 import time
 
 import redis
+from fastapi import HTTPException
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
 from config import settings
+from security import decode_token
 
 logger = logging.getLogger("aura_cx.rate_limiter")
 
@@ -70,7 +72,16 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
                 pass  # fail-open
 
         # ── Per-tenant rate limit ────────────────────────────
-        tenant_id = request.headers.get("x-tenant-id")
+        tenant_id = None
+        auth_header = request.headers.get("authorization", "")
+        if auth_header.lower().startswith("bearer "):
+            try:
+                payload = decode_token(auth_header.split(" ", 1)[1])
+                tenant_id = payload.get("tenant")
+            except HTTPException:
+                tenant_id = None
+        if not tenant_id and settings.ENVIRONMENT != "production":
+            tenant_id = request.headers.get("x-tenant-id")
         if not tenant_id:
             parts = request.url.path.split("/")
             if "webhooks" in parts:

@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass
-from typing import AsyncIterator
+from typing import AsyncIterator, TYPE_CHECKING
 
 import httpx
 
@@ -14,6 +14,9 @@ from config import settings
 logger = logging.getLogger("aura_cx.ai_providers")
 
 SUPPORTED_PROVIDERS = {"gemini", "openai", "anthropic", "mistral", "ollama", "openrouter", "self_hosted"}
+
+if TYPE_CHECKING:
+    from models import TenantConfig
 
 
 class ProviderConfigurationError(RuntimeError):
@@ -66,6 +69,79 @@ def env_provider_config(provider: str) -> ProviderConfig:
     raise ProviderConfigurationError(f"Unsupported AI provider: {provider}")
 
 
+def _default_model(provider: str) -> str:
+    return env_provider_config(provider).model
+
+
+def tenant_provider_configs(config: "TenantConfig | None") -> dict[str, ProviderConfig]:
+    """Build decrypted provider configs from a tenant BYOK record.
+
+    The returned map is intentionally tenant-scoped and secret-bearing; callers
+    should use it only in-process for outbound provider calls and never return
+    it in API responses or logs.
+    """
+    if config is None:
+        return {}
+
+    from services.encryption import decrypt_value
+
+    def dec(value: str | None) -> str:
+        return decrypt_value(value) if value else ""
+
+    preferred_model = (config.ai_model or "").strip()
+    configs: dict[str, ProviderConfig] = {}
+    if config.gemini_api_key_enc:
+        configs["gemini"] = ProviderConfig(
+            "gemini",
+            dec(config.gemini_api_key_enc),
+            "",
+            preferred_model if config.ai_provider == "gemini" and preferred_model else _default_model("gemini"),
+        )
+    if config.openai_api_key_enc:
+        configs["openai"] = ProviderConfig(
+            "openai",
+            dec(config.openai_api_key_enc),
+            "https://api.openai.com/v1",
+            preferred_model if config.ai_provider == "openai" and preferred_model else _default_model("openai"),
+        )
+    if config.anthropic_api_key_enc:
+        configs["anthropic"] = ProviderConfig(
+            "anthropic",
+            dec(config.anthropic_api_key_enc),
+            "https://api.anthropic.com/v1",
+            preferred_model if config.ai_provider == "anthropic" and preferred_model else _default_model("anthropic"),
+        )
+    if config.mistral_api_key_enc:
+        configs["mistral"] = ProviderConfig(
+            "mistral",
+            dec(config.mistral_api_key_enc),
+            "https://api.mistral.ai/v1",
+            preferred_model if config.ai_provider == "mistral" and preferred_model else _default_model("mistral"),
+        )
+    if config.openrouter_api_key_enc:
+        configs["openrouter"] = ProviderConfig(
+            "openrouter",
+            dec(config.openrouter_api_key_enc),
+            "https://openrouter.ai/api/v1",
+            preferred_model if config.ai_provider == "openrouter" and preferred_model else _default_model("openrouter"),
+        )
+    if config.ollama_base_url:
+        configs["ollama"] = ProviderConfig(
+            "ollama",
+            "",
+            config.ollama_base_url.rstrip("/"),
+            preferred_model if config.ai_provider == "ollama" and preferred_model else _default_model("ollama"),
+        )
+    if config.self_hosted_base_url:
+        configs["self_hosted"] = ProviderConfig(
+            "self_hosted",
+            dec(config.self_hosted_api_key_enc),
+            config.self_hosted_base_url.rstrip("/"),
+            preferred_model if config.ai_provider == "self_hosted" and preferred_model else settings.SELF_HOSTED_AI_MODEL,
+        )
+    return configs
+
+
 def _text_from_openai(data: dict) -> str:
     return data["choices"][0]["message"]["content"]
 
@@ -77,6 +153,7 @@ async def generate_text(
     preferred_provider: str | None = None,
     fallback_order: list[str] | None = None,
     override: ProviderConfig | None = None,
+    provider_configs: dict[str, ProviderConfig] | None = None,
 ) -> tuple[str, str]:
     providers = [preferred_provider or settings.AI_PROVIDER, *(fallback_order or settings.ai_fallback_order_list)]
     seen: set[str] = set()
@@ -86,7 +163,11 @@ async def generate_text(
         if provider in seen or provider not in SUPPORTED_PROVIDERS:
             continue
         seen.add(provider)
-        config = override if override and override.provider == provider else env_provider_config(provider)
+        config = (
+            override
+            if override and override.provider == provider
+            else (provider_configs or {}).get(provider, env_provider_config(provider))
+        )
         try:
             return await _generate_with_retries(config, prompt, response_json=response_json), provider
         except ProviderConfigurationError as exc:
@@ -104,12 +185,12 @@ async def stream_text(prompt: str, *, preferred_provider: str | None = None) -> 
         await asyncio.sleep(0)
 
 
-async def provider_health() -> dict[str, dict]:
+async def provider_health(provider_configs: dict[str, ProviderConfig] | None = None) -> dict[str, dict]:
     status: dict[str, dict] = {}
     for provider in SUPPORTED_PROVIDERS:
-        cfg = env_provider_config(provider)
+        cfg = (provider_configs or {}).get(provider, env_provider_config(provider))
         status[provider] = {
-            "configured": bool(cfg.api_key or provider == "ollama" and cfg.base_url or provider == "self_hosted" and cfg.base_url),
+            "configured": bool(cfg.api_key or (provider in {"ollama", "self_hosted"} and cfg.base_url)),
             "model": cfg.model,
             "base_url": cfg.base_url if provider in {"ollama", "self_hosted"} else "",
         }
