@@ -26,6 +26,7 @@ ALTER TABLE customer_profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE integration_sources ENABLE ROW LEVEL SECURITY;
 ALTER TABLE knowledge_documents ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tenant_configs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE platform_api_connections ENABLE ROW LEVEL SECURITY;
 ALTER TABLE team_invitations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE refresh_token_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE password_reset_tokens ENABLE ROW LEVEL SECURITY;
@@ -58,6 +59,10 @@ CREATE POLICY tenant_isolation_integration_sources ON integration_sources
 -- tenant_configs
 DROP POLICY IF EXISTS tenant_isolation_tenant_configs ON tenant_configs;
 CREATE POLICY tenant_isolation_tenant_configs ON tenant_configs
+    USING (tenant_id = current_setting('app.current_tenant', true));
+
+DROP POLICY IF EXISTS tenant_isolation_platform_api_connections ON platform_api_connections;
+CREATE POLICY tenant_isolation_platform_api_connections ON platform_api_connections
     USING (tenant_id = current_setting('app.current_tenant', true));
 
 -- team_invitations

@@ -24,9 +24,6 @@ from services.sla_engine import assign_sla
 
 router = APIRouter()
 
-ALLOWED_CHANNELS = {"x", "reddit", "gmail", "whatsapp", "web_form"}
-
-
 class WebhookPayload(BaseModel):
     channel: str | None = None
     raw_content: str = Field(min_length=1)
@@ -42,8 +39,8 @@ class WebhookPayload(BaseModel):
         if value is None:
             return value
         value = value.lower().strip()
-        if value not in ALLOWED_CHANNELS:
-            raise ValueError("channel must be x, reddit, gmail, whatsapp, or web_form")
+        if not value or len(value) > 128 or not all(ch.isalnum() or ch in {"_", "-"} for ch in value):
+            raise ValueError("channel must be a valid platform slug")
         return value
 
 
@@ -220,7 +217,7 @@ async def ingest_webhook(
     Deduplication: Uses Redis to detect and reject duplicate messages.
     """
     channel = channel.lower()
-    if channel not in ALLOWED_CHANNELS:
+    if not channel or len(channel) > 128 or not all(ch.isalnum() or ch in {"_", "-"} for ch in channel):
         raise HTTPException(status_code=400, detail="Unsupported channel")
     
     # Get raw request body for HMAC verification
@@ -307,6 +304,9 @@ async def ingest_with_jwt(
     session: Annotated[AsyncSession, Depends(get_session)],
     tenant_id: str | None = None,
 ):
+    if settings.ENVIRONMENT.lower() == "production":
+        raise HTTPException(status_code=403, detail="Development ingestion is disabled in production")
+
     scoped_tenant = assert_tenant(user, tenant_id)
     sources = (
         await session.scalars(

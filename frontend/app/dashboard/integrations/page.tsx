@@ -463,6 +463,7 @@ function MonitorSourcesTab() {
   const [newSource, setNewSource] = useState<IntegrationSource | null>(null);
   const [form, setForm] = useState({ platform: "x", identifier: "", label: "" });
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   const authHeaders = (): Record<string, string> => {
     const token = typeof window !== "undefined" ? localStorage.getItem("aura_token") : null;
@@ -480,19 +481,30 @@ function MonitorSourcesTab() {
   useEffect(() => { load(); }, [load]);
 
   const handleAdd = async () => {
-    if (!form.identifier.trim()) return;
-    const res = await fetch(`${API}/api/v1/integrations`, {
-      method: "POST",
-      headers: authHeaders(),
-      body: JSON.stringify(form),
-    });
-    const data = await res.json();
-    setAdding(false);
-    setForm({ platform: "x", identifier: "", label: "" });
-    if (data.source?.webhook_secret) {
-      setNewSource(data.source);
+    if (!form.identifier.trim()) {
+      setError("Identifier is required.");
+      return;
     }
-    load();
+    setError("");
+    try {
+      const res = await fetch(`${API}/api/v1/integrations`, {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify(form),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.detail || "Could not add source.");
+      }
+      setAdding(false);
+      setForm({ platform: "x", identifier: "", label: "" });
+      if (data.source?.webhook_secret) {
+        setNewSource(data.source);
+      }
+      load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not add source.");
+    }
   };
 
   const handleRemove = async (id: string) => {
@@ -534,6 +546,7 @@ function MonitorSourcesTab() {
         {adding && (
           <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="glass-card p-5">
             <h3 className="text-sm font-semibold mb-4">Add Monitoring Source</h3>
+            {error && <p className="mb-3 text-xs text-[var(--accent-danger)]">{error}</p>}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
               <div>
                 <label className="block text-[10px] text-[var(--text-muted)] mb-1.5 uppercase tracking-wider font-semibold">Platform</label>

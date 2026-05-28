@@ -28,6 +28,7 @@ class MonitorError(RuntimeError):
 async def poll_x_mentions(
     query: str,
     *,
+    bearer_token: str | None = None,
     since_id: str | None = None,
     max_results: int = 50,
 ) -> dict[str, Any]:
@@ -37,8 +38,9 @@ async def poll_x_mentions(
     Returns:
         {"posts": [{"id", "text", "author_handle", "author_name", "created_at", "url"}], "newest_id": str}
     """
-    if not settings.X_BEARER_TOKEN:
-        raise MonitorError("X_BEARER_TOKEN is not configured")
+    token = bearer_token or settings.X_BEARER_TOKEN
+    if not token:
+        raise MonitorError("X bearer token is not configured")
 
     params: dict[str, Any] = {
         "query": query,
@@ -55,7 +57,7 @@ async def poll_x_mentions(
             resp = await client.get(
                 "https://api.twitter.com/2/tweets/search/recent",
                 params=params,
-                headers={"Authorization": f"Bearer {settings.X_BEARER_TOKEN}"},
+                headers={"Authorization": f"Bearer {token}"},
             )
             resp.raise_for_status()
             data = resp.json()
@@ -95,6 +97,7 @@ async def poll_x_mentions(
 def poll_email_inbox(
     folder: str = "INBOX",
     *,
+    credentials: dict[str, Any] | None = None,
     since_uid: str | None = None,
     max_results: int = 50,
 ) -> dict[str, Any]:
@@ -104,16 +107,25 @@ def poll_email_inbox(
     Returns:
         {"posts": [{"id", "text", "author_handle", "author_name", "subject", "created_at"}], "newest_id": str}
     """
-    if not settings.IMAP_HOST or not settings.IMAP_USER:
+    credentials = credentials or {}
+    host = str(credentials.get("imap_host") or credentials.get("host") or settings.IMAP_HOST or "")
+    port = int(credentials.get("imap_port") or credentials.get("port") or settings.IMAP_PORT)
+    user = str(credentials.get("imap_user") or credentials.get("user") or credentials.get("username") or settings.IMAP_USER or "")
+    password = str(credentials.get("imap_password") or credentials.get("password") or settings.IMAP_PASSWORD or "")
+    use_ssl = credentials.get("imap_use_ssl", credentials.get("use_ssl", settings.IMAP_USE_SSL))
+    if isinstance(use_ssl, str):
+        use_ssl = use_ssl.lower() not in {"false", "0", "no"}
+
+    if not host or not user:
         raise MonitorError("IMAP settings not configured")
 
     try:
-        if settings.IMAP_USE_SSL:
-            mail = imaplib.IMAP4_SSL(settings.IMAP_HOST, settings.IMAP_PORT)
+        if use_ssl:
+            mail = imaplib.IMAP4_SSL(host, port)
         else:
-            mail = imaplib.IMAP4(settings.IMAP_HOST, settings.IMAP_PORT)
+            mail = imaplib.IMAP4(host, port)
 
-        mail.login(settings.IMAP_USER, settings.IMAP_PASSWORD)
+        mail.login(user, password)
         mail.select(folder, readonly=True)
 
         if since_uid:
@@ -182,6 +194,7 @@ def poll_email_inbox(
 
 async def poll_threads_mentions(
     *,
+    access_token: str | None = None,
     since_timestamp: str | None = None,
     max_results: int = 50,
 ) -> dict[str, Any]:
@@ -191,14 +204,15 @@ async def poll_threads_mentions(
     Returns:
         {"posts": [{"id", "text", "author_handle", "author_name", "created_at", "url"}], "newest_id": str}
     """
-    if not settings.THREADS_ACCESS_TOKEN:
-        raise MonitorError("THREADS_ACCESS_TOKEN is not configured")
+    token = access_token or settings.THREADS_ACCESS_TOKEN
+    if not token:
+        raise MonitorError("Threads access token is not configured")
 
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
             params: dict[str, Any] = {
                 "fields": "id,text,timestamp,username",
-                "access_token": settings.THREADS_ACCESS_TOKEN,
+                "access_token": token,
                 "limit": min(max_results, 100),
             }
             if since_timestamp:
@@ -237,3 +251,188 @@ async def poll_threads_mentions(
     except Exception:
         logger.exception("Threads polling failed")
         return {"posts": [], "newest_id": since_timestamp}
+
+
+def _path_get(data: Any, path: str | None) -> Any:
+    if not path:
+        return None
+    current = data
+    for part in path.split("."):
+        if isinstance(current, dict):
+            current = current.get(part)
+        elif isinstance(current, list) and part.isdigit():
+            current = current[int(part)] if int(part) < len(current) else None
+        else:
+            return None
+    return current
+
+
+async def poll_reddit_mentions(
+    query: str,
+    *,
+    credentials: dict[str, Any],
+    after: str | None = None,
+    max_results: int = 50,
+) -> dict[str, Any]:
+    """Search Reddit for posts/comments that mention the configured bank account."""
+    client_id = str(credentials.get("client_id") or "")
+    client_secret = str(credentials.get("client_secret") or "")
+    user_agent = str(credentials.get("user_agent") or "AURA-CX/1.0")
+    if not client_id or not client_secret:
+        raise MonitorError("Reddit client_id/client_secret are not configured")
+
+    try:
+        async with httpx.AsyncClient(timeout=30.0, headers={"User-Agent": user_agent}) as client:
+            token_resp = await client.post(
+                "https://www.reddit.com/api/v1/access_token",
+                data={"grant_type": "client_credentials"},
+                auth=(client_id, client_secret),
+            )
+            token_resp.raise_for_status()
+            token = token_resp.json().get("access_token")
+            if not token:
+                raise MonitorError("Reddit did not return an access token")
+
+            subreddit = str(credentials.get("subreddit") or "").strip().lstrip("r/")
+            account = query.strip()
+            if account.lower().startswith("r/") and not subreddit:
+                subreddit = account[2:]
+            url = f"https://oauth.reddit.com/r/{subreddit}/search" if subreddit else "https://oauth.reddit.com/search"
+            params: dict[str, Any] = {
+                "q": str(credentials.get("query") or query),
+                "sort": "new",
+                "limit": min(max(max_results, 1), 100),
+                "restrict_sr": bool(subreddit),
+            }
+            if after:
+                params["after"] = after
+
+            resp = await client.get(url, params=params, headers={"Authorization": f"Bearer {token}"})
+            resp.raise_for_status()
+            data = resp.json().get("data", {})
+
+        posts = []
+        for child in data.get("children", []):
+            item = child.get("data", {})
+            external_id = item.get("name") or item.get("id")
+            if not external_id:
+                continue
+            text = item.get("selftext") or item.get("body") or item.get("title") or ""
+            if item.get("title") and item.get("selftext"):
+                text = f"{item.get('title')}\n\n{item.get('selftext')}"
+            posts.append({
+                "id": external_id,
+                "text": text,
+                "author_handle": f"u/{item.get('author', 'unknown')}",
+                "author_name": item.get("author"),
+                "created_at": item.get("created_utc"),
+                "url": f"https://www.reddit.com{item.get('permalink', '')}" if item.get("permalink") else None,
+            })
+        return {"posts": posts, "newest_id": data.get("after") or after}
+
+    except MonitorError:
+        raise
+    except httpx.HTTPStatusError as exc:
+        logger.error("Reddit API error: %s %s", exc.response.status_code, exc.response.text[:200])
+        return {"posts": [], "newest_id": after}
+    except Exception:
+        logger.exception("Reddit polling failed")
+        return {"posts": [], "newest_id": after}
+
+
+async def poll_generic_http_platform(
+    *,
+    account_identifier: str,
+    credentials: dict[str, Any],
+    cursor: str | None = None,
+    max_results: int = 50,
+) -> dict[str, Any]:
+    """
+    Poll a custom platform endpoint.
+
+    Expected credential keys: endpoint_url/api_url/url, optional token/api_key,
+    optional items_path, next_cursor_path, field_map, params, and headers.
+    """
+    endpoint = str(credentials.get("endpoint_url") or credentials.get("api_url") or credentials.get("url") or "")
+    if not endpoint:
+        raise MonitorError("Generic platform requires endpoint_url, api_url, or url")
+
+    method = str(credentials.get("method") or "GET").upper()
+    params = dict(credentials.get("params") or {})
+    headers = dict(credentials.get("headers") or {})
+    token = credentials.get("bearer_token") or credentials.get("access_token") or credentials.get("api_token") or credentials.get("token")
+    api_key = credentials.get("api_key")
+    if token:
+        headers.setdefault("Authorization", f"Bearer {token}")
+    if api_key:
+        headers[str(credentials.get("api_key_header") or "X-API-Key")] = str(api_key)
+
+    account_param = credentials.get("account_param")
+    if account_param:
+        params[str(account_param)] = account_identifier
+    cursor_param = credentials.get("cursor_param")
+    if cursor and cursor_param:
+        params[str(cursor_param)] = cursor
+    limit_param = credentials.get("limit_param")
+    if limit_param:
+        params[str(limit_param)] = min(max_results, 100)
+
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            if method == "POST":
+                resp = await client.post(endpoint, json=dict(credentials.get("body") or {}), params=params, headers=headers)
+            else:
+                resp = await client.get(endpoint, params=params, headers=headers)
+            resp.raise_for_status()
+            data = resp.json()
+
+        items = _path_get(data, str(credentials.get("items_path") or "")) if credentials.get("items_path") else None
+        if items is None:
+            for path in ("data", "items", "results"):
+                candidate = _path_get(data, path)
+                if isinstance(candidate, list):
+                    items = candidate
+                    break
+        if not isinstance(items, list):
+            items = data if isinstance(data, list) else []
+
+        field_map = dict(credentials.get("field_map") or {})
+        posts = []
+        for index, item in enumerate(items[:max_results]):
+            if not isinstance(item, dict):
+                continue
+            def mapped(name: str, *fallbacks: str) -> Any:
+                path = field_map.get(name)
+                if path:
+                    return _path_get(item, str(path))
+                for fallback in fallbacks:
+                    value = _path_get(item, fallback)
+                    if value is not None:
+                        return value
+                return None
+
+            external_id = mapped("id", "id", "external_id", "message_id") or f"{cursor or 'item'}_{index}"
+            text = mapped("text", "text", "content", "body", "message") or ""
+            posts.append({
+                "id": str(external_id),
+                "text": str(text),
+                "author_handle": str(mapped("author_handle", "author.username", "author_handle", "sender_id", "from") or "unknown"),
+                "author_name": mapped("author_name", "author.name", "sender_name", "name"),
+                "created_at": mapped("created_at", "created_at", "timestamp", "date"),
+                "url": mapped("url", "url", "permalink"),
+                "raw": item,
+            })
+
+        next_cursor = _path_get(data, str(credentials.get("next_cursor_path") or "")) if credentials.get("next_cursor_path") else None
+        if not next_cursor and posts:
+            next_cursor = posts[0]["id"]
+        return {"posts": posts, "newest_id": str(next_cursor) if next_cursor else cursor}
+
+    except MonitorError:
+        raise
+    except httpx.HTTPStatusError as exc:
+        logger.error("Generic platform API error: %s %s", exc.response.status_code, exc.response.text[:200])
+        return {"posts": [], "newest_id": cursor}
+    except Exception:
+        logger.exception("Generic platform polling failed")
+        return {"posts": [], "newest_id": cursor}

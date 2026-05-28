@@ -173,7 +173,7 @@ export const ROLE_ROUTES: Record<UserRole, string[]> = {
     "/dashboard/voice",
     "/dashboard/compliance",
   ],
-  executive: ["/dashboard", "/dashboard/executive", "/dashboard/analytics", "/dashboard/subscriptions", "/dashboard/profiles", "/dashboard/compliance"],
+  executive: ["/dashboard", "/dashboard/executive", "/dashboard/analytics", "/dashboard/subscriptions", "/dashboard/profiles", "/dashboard/integrations", "/dashboard/compliance", "/dashboard/settings"],
   manager: ["/dashboard", "/dashboard/analytics", "/dashboard/profiles", "/dashboard/hitl", "/dashboard/shadow-tickets", "/dashboard/qa-review", "/dashboard/knowledge", "/dashboard/team", "/dashboard/voice", "/dashboard/compliance"],
   qa_reviewer: ["/dashboard", "/dashboard/qa-review", "/dashboard/hitl", "/dashboard/analytics", "/dashboard/profiles", "/dashboard/knowledge", "/dashboard/voice"],
   support_agent: ["/dashboard", "/dashboard/profiles", "/dashboard/hitl", "/dashboard/knowledge", "/dashboard/voice"],

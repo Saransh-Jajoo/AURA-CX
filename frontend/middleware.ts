@@ -5,7 +5,7 @@ type UserRole = "super_admin" | "tenant_admin" | "executive" | "manager" | "supp
 const ROLE_ROUTES: Record<UserRole, string[]> = {
   super_admin: ["/dashboard", "/dashboard/admin", "/dashboard/analytics", "/dashboard/profiles", "/dashboard/hitl", "/dashboard/shadow-tickets", "/dashboard/qa-review", "/dashboard/integrations", "/dashboard/subscriptions", "/dashboard/executive", "/dashboard/knowledge", "/dashboard/team", "/dashboard/settings", "/dashboard/voice", "/dashboard/compliance"],
   tenant_admin: ["/dashboard", "/dashboard/admin", "/dashboard/analytics", "/dashboard/profiles", "/dashboard/hitl", "/dashboard/shadow-tickets", "/dashboard/qa-review", "/dashboard/integrations", "/dashboard/subscriptions", "/dashboard/executive", "/dashboard/knowledge", "/dashboard/team", "/dashboard/settings", "/dashboard/voice", "/dashboard/compliance"],
-  executive: ["/dashboard", "/dashboard/executive", "/dashboard/analytics", "/dashboard/subscriptions", "/dashboard/profiles", "/dashboard/compliance"],
+  executive: ["/dashboard", "/dashboard/executive", "/dashboard/analytics", "/dashboard/subscriptions", "/dashboard/profiles", "/dashboard/compliance", "/dashboard/settings"],
   manager: ["/dashboard", "/dashboard/analytics", "/dashboard/profiles", "/dashboard/hitl", "/dashboard/shadow-tickets", "/dashboard/qa-review", "/dashboard/knowledge", "/dashboard/team", "/dashboard/voice", "/dashboard/compliance"],
   qa_reviewer: ["/dashboard", "/dashboard/qa-review", "/dashboard/hitl", "/dashboard/analytics", "/dashboard/profiles", "/dashboard/knowledge", "/dashboard/voice"],
   support_agent: ["/dashboard", "/dashboard/profiles", "/dashboard/hitl", "/dashboard/knowledge", "/dashboard/voice"],

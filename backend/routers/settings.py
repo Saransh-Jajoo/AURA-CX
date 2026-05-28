@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Annotated
+import json
+import re
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -10,7 +12,17 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_session
-from models import AuditEvent, IntegrationSource, KnowledgeDocument, TeamInvitation, Tenant, TenantConfig, User
+from models import (
+    AuditEvent,
+    IntegrationSource,
+    KnowledgeDocument,
+    PlatformAPIConnection,
+    SocialMonitorConfig,
+    TeamInvitation,
+    Tenant,
+    TenantConfig,
+    User,
+)
 from security import assert_tenant, require_roles
 from services.ai_providers import provider_health, tenant_provider_configs
 from services.encryption import encrypt_value, decrypt_value
@@ -80,6 +92,22 @@ class PlatformConnectionUpdate(BaseModel):
     gmail_imap_pass: str | None = None
     # Threads
     threads_access_token: str | None = None
+
+
+class DynamicPlatformConnectionIn(BaseModel):
+    platform_name: str = Field(min_length=1, max_length=128)
+    account_identifier: str = Field(min_length=1, max_length=512)
+    credentials: dict[str, Any] = Field(default_factory=dict)
+    active: bool = True
+    poll_interval_seconds: int = Field(default=300, ge=60, le=86400)
+
+
+class DynamicPlatformConnectionPatch(BaseModel):
+    platform_name: str | None = Field(default=None, min_length=1, max_length=128)
+    account_identifier: str | None = Field(default=None, min_length=1, max_length=512)
+    credentials: dict[str, Any] | None = None
+    active: bool | None = None
+    poll_interval_seconds: int | None = Field(default=None, ge=60, le=86400)
 
 
 def _mask_credential(value: str | None) -> str:
@@ -157,9 +185,121 @@ def _platform_status(config: TenantConfig | None) -> dict:
     }
 
 
+def _platform_slug(name: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "_", name.lower().strip()).strip("_")
+    if not slug:
+        raise HTTPException(status_code=400, detail="Platform name must contain letters or numbers")
+    return slug[:128]
+
+
+def _validate_credentials(credentials: dict[str, Any]) -> dict[str, Any]:
+    if not credentials:
+        raise HTTPException(status_code=400, detail="At least one credential field is required")
+    clean: dict[str, Any] = {}
+    for key, value in credentials.items():
+        clean_key = str(key).strip()
+        if not clean_key or len(clean_key) > 128:
+            raise HTTPException(status_code=400, detail="Credential keys must be 1-128 characters")
+        if isinstance(value, (dict, list)):
+            clean[clean_key] = value
+        elif value is None:
+            clean[clean_key] = None
+        else:
+            clean[clean_key] = str(value)
+    return clean
+
+
+def _dynamic_platform_to_dict(connection: PlatformAPIConnection) -> dict:
+    fields: list[str] = []
+    if connection.credentials_enc:
+        try:
+            credentials = json.loads(decrypt_value(connection.credentials_enc))
+            fields = sorted(str(key) for key in credentials.keys())
+        except Exception:  # noqa: BLE001
+            fields = []
+    return {
+        "id": connection.id,
+        "tenant_id": connection.tenant_id,
+        "platform_name": connection.platform_name,
+        "platform_slug": connection.platform_slug,
+        "account_identifier": connection.account_identifier,
+        "credential_fields": fields,
+        "credentials_configured": bool(connection.credentials_enc),
+        "active": connection.active,
+        "poll_interval_seconds": connection.poll_interval_seconds,
+        "last_polled_at": connection.last_polled_at.isoformat() if connection.last_polled_at else None,
+        "last_error": connection.last_error,
+        "created_at": connection.created_at.isoformat(),
+        "updated_at": connection.updated_at.isoformat(),
+    }
+
+
+async def _sync_dynamic_platform_runtime_records(
+    session: AsyncSession,
+    connection: PlatformAPIConnection,
+) -> None:
+    """Keep legacy listener rows aligned so live polling can reuse ingestion semantics."""
+    source = await session.get(IntegrationSource, connection.integration_source_id) if connection.integration_source_id else None
+    if source is None:
+        source = await session.scalar(
+            select(IntegrationSource).where(
+                IntegrationSource.tenant_id == connection.tenant_id,
+                IntegrationSource.platform == connection.platform_slug,
+                IntegrationSource.identifier == connection.account_identifier,
+            )
+        )
+    if source is None:
+        source = IntegrationSource(
+            tenant_id=connection.tenant_id,
+            platform=connection.platform_slug,
+            identifier=connection.account_identifier,
+            label=f"{connection.platform_name} official account",
+            active=connection.active,
+            filters={"dynamic_platform_connection_id": connection.id},
+        )
+        session.add(source)
+        await session.flush()
+    else:
+        source.platform = connection.platform_slug
+        source.identifier = connection.account_identifier
+        source.label = f"{connection.platform_name} official account"
+        source.active = connection.active
+        source.filters = {**(source.filters or {}), "dynamic_platform_connection_id": connection.id}
+    connection.integration_source_id = source.id
+
+    monitor = await session.get(SocialMonitorConfig, connection.monitor_config_id) if connection.monitor_config_id else None
+    if monitor is None:
+        monitor = await session.scalar(
+            select(SocialMonitorConfig).where(
+                SocialMonitorConfig.tenant_id == connection.tenant_id,
+                SocialMonitorConfig.platform == connection.platform_slug,
+                SocialMonitorConfig.target_type == "account",
+                SocialMonitorConfig.target_value == connection.account_identifier,
+            )
+        )
+    if monitor is None:
+        monitor = SocialMonitorConfig(
+            tenant_id=connection.tenant_id,
+            platform=connection.platform_slug,
+            target_type="account",
+            target_value=connection.account_identifier,
+            label=f"{connection.platform_name} live account",
+            active=connection.active,
+        )
+        session.add(monitor)
+        await session.flush()
+    else:
+        monitor.platform = connection.platform_slug
+        monitor.target_type = "account"
+        monitor.target_value = connection.account_identifier
+        monitor.label = f"{connection.platform_name} live account"
+        monitor.active = connection.active
+    connection.monitor_config_id = monitor.id
+
+
 @router.get("/settings")
 async def get_tenant_settings(
-    user: Annotated[User, Depends(require_roles("tenant_admin"))],
+    user: Annotated[User, Depends(require_roles("tenant_admin", "executive"))],
     session: Annotated[AsyncSession, Depends(get_session)],
 ):
     """Get tenant settings and BYOI configuration status."""
@@ -381,6 +521,165 @@ async def get_platform_connections(
     if tenant is None:
         raise HTTPException(status_code=404, detail="Tenant not found")
     return {"platforms": _platform_status(tenant.config)}
+
+
+@router.get("/settings/platform-api-connections")
+async def list_dynamic_platform_connections(
+    user: Annotated[User, Depends(require_roles("executive"))],
+    session: Annotated[AsyncSession, Depends(get_session)],
+):
+    """List executive-managed dynamic platform API connections without exposing secrets."""
+    tenant_id = assert_tenant(user, None)
+    connections = (
+        await session.scalars(
+            select(PlatformAPIConnection)
+            .where(PlatformAPIConnection.tenant_id == tenant_id)
+            .order_by(PlatformAPIConnection.created_at.desc())
+        )
+    ).all()
+    return {"connections": [_dynamic_platform_to_dict(item) for item in connections], "total": len(connections)}
+
+
+@router.post("/settings/platform-api-connections")
+async def create_dynamic_platform_connection(
+    body: DynamicPlatformConnectionIn,
+    user: Annotated[User, Depends(require_roles("executive"))],
+    session: Annotated[AsyncSession, Depends(get_session)],
+):
+    """Create a dynamic live platform connection with encrypted credentials."""
+    tenant_id = assert_tenant(user, None)
+    credentials = _validate_credentials(body.credentials)
+    platform_slug = _platform_slug(body.platform_name)
+    account_identifier = body.account_identifier.strip()
+    existing = await session.scalar(
+        select(PlatformAPIConnection).where(
+            PlatformAPIConnection.tenant_id == tenant_id,
+            PlatformAPIConnection.platform_slug == platform_slug,
+            PlatformAPIConnection.account_identifier == account_identifier,
+        )
+    )
+    if existing:
+        raise HTTPException(status_code=409, detail="A connection for this platform account already exists")
+    connection = PlatformAPIConnection(
+        tenant_id=tenant_id,
+        platform_name=body.platform_name.strip(),
+        platform_slug=platform_slug,
+        account_identifier=account_identifier,
+        credentials_enc=encrypt_value(json.dumps(credentials)),
+        active=body.active,
+        poll_interval_seconds=body.poll_interval_seconds,
+    )
+    session.add(connection)
+    await session.flush()
+    await _sync_dynamic_platform_runtime_records(session, connection)
+    session.add(AuditEvent(
+        tenant_id=tenant_id,
+        user_id=user.id,
+        action="platform_api_connection.create",
+        resource_type="platform_api_connection",
+        resource_id=connection.id,
+        details={"platform": connection.platform_slug, "account_identifier": connection.account_identifier},
+    ))
+    await session.commit()
+    await session.refresh(connection)
+    return {"status": "created", "connection": _dynamic_platform_to_dict(connection)}
+
+
+@router.patch("/settings/platform-api-connections/{connection_id}")
+async def update_dynamic_platform_connection(
+    connection_id: str,
+    body: DynamicPlatformConnectionPatch,
+    user: Annotated[User, Depends(require_roles("executive"))],
+    session: Annotated[AsyncSession, Depends(get_session)],
+):
+    """Update a dynamic live platform connection. Omitted credentials remain unchanged."""
+    connection = await session.get(PlatformAPIConnection, connection_id)
+    if connection is None:
+        raise HTTPException(status_code=404, detail="Platform connection not found")
+    assert_tenant(user, connection.tenant_id)
+
+    previous = {
+        "platform_name": connection.platform_name,
+        "platform_slug": connection.platform_slug,
+        "account_identifier": connection.account_identifier,
+        "active": connection.active,
+    }
+    if body.platform_name is not None:
+        connection.platform_name = body.platform_name.strip()
+        connection.platform_slug = _platform_slug(body.platform_name)
+    if body.account_identifier is not None:
+        connection.account_identifier = body.account_identifier.strip()
+    if body.credentials is not None:
+        credentials = _validate_credentials(body.credentials)
+        connection.credentials_enc = encrypt_value(json.dumps(credentials))
+        connection.poll_cursor = None
+        connection.last_error = None
+    if body.active is not None:
+        connection.active = body.active
+    if body.poll_interval_seconds is not None:
+        connection.poll_interval_seconds = body.poll_interval_seconds
+
+    duplicate = await session.scalar(
+        select(PlatformAPIConnection).where(
+            PlatformAPIConnection.tenant_id == connection.tenant_id,
+            PlatformAPIConnection.platform_slug == connection.platform_slug,
+            PlatformAPIConnection.account_identifier == connection.account_identifier,
+            PlatformAPIConnection.id != connection.id,
+        )
+    )
+    if duplicate:
+        raise HTTPException(status_code=409, detail="A connection for this platform account already exists")
+
+    await _sync_dynamic_platform_runtime_records(session, connection)
+    session.add(AuditEvent(
+        tenant_id=connection.tenant_id,
+        user_id=user.id,
+        action="platform_api_connection.update",
+        resource_type="platform_api_connection",
+        resource_id=connection.id,
+        previous_state=previous,
+        new_state={
+            "platform_name": connection.platform_name,
+            "platform_slug": connection.platform_slug,
+            "account_identifier": connection.account_identifier,
+            "active": connection.active,
+        },
+    ))
+    await session.commit()
+    await session.refresh(connection)
+    return {"status": "updated", "connection": _dynamic_platform_to_dict(connection)}
+
+
+@router.delete("/settings/platform-api-connections/{connection_id}")
+async def delete_dynamic_platform_connection(
+    connection_id: str,
+    user: Annotated[User, Depends(require_roles("executive"))],
+    session: Annotated[AsyncSession, Depends(get_session)],
+):
+    """Remove a dynamic platform from live monitoring."""
+    connection = await session.get(PlatformAPIConnection, connection_id)
+    if connection is None:
+        raise HTTPException(status_code=404, detail="Platform connection not found")
+    assert_tenant(user, connection.tenant_id)
+    if connection.integration_source_id:
+        source = await session.get(IntegrationSource, connection.integration_source_id)
+        if source:
+            source.active = False
+    if connection.monitor_config_id:
+        monitor = await session.get(SocialMonitorConfig, connection.monitor_config_id)
+        if monitor:
+            monitor.active = False
+    session.add(AuditEvent(
+        tenant_id=connection.tenant_id,
+        user_id=user.id,
+        action="platform_api_connection.delete",
+        resource_type="platform_api_connection",
+        resource_id=connection.id,
+        details={"platform": connection.platform_slug, "account_identifier": connection.account_identifier},
+    ))
+    await session.delete(connection)
+    await session.commit()
+    return {"status": "deleted", "id": connection_id}
 
 
 @router.get("/settings/ai-providers/health")

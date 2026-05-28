@@ -12,8 +12,8 @@ import { AlertBanner } from "@/components/alert-banner";
 import { ThemeToggleCompact } from "@/components/theme-toggle";
 import { fetchShadowTickets } from "@/lib/api";
 import {
-  Search, Bell, Settings, LayoutDashboard, Ticket, BarChart3,
-  Brain, Users, Menu, X,
+  Bell, LayoutDashboard, Ticket, BarChart3,
+  Brain, Users, Settings, ClipboardCheck, Link2,
 } from "lucide-react";
 
 /* ── Custom hook: detect screen width breakpoints ──────── */
@@ -32,49 +32,34 @@ function useMediaQuery(query: string) {
 
 /* ── Top-level tab nav items matching mockup ─────────────── */
 const NAV_TABS = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/dashboard/hitl", label: "Tickets", icon: Ticket },
-  { href: "/dashboard/analytics", label: "Analytics", icon: BarChart3 },
-  { href: "/dashboard/shadow-tickets", label: "AI Training", icon: Brain },
-  { href: "/dashboard/profiles", label: "Team", icon: Users },
+  { href: "/dashboard", label: "Command", icon: LayoutDashboard },
+  { href: "/dashboard/hitl", label: "Cases", icon: Ticket },
+  { href: "/dashboard/qa-review", label: "Review", icon: ClipboardCheck },
+  { href: "/dashboard/analytics", label: "Risk", icon: BarChart3 },
+  { href: "/dashboard/shadow-tickets", label: "Training", icon: Brain },
+  { href: "/dashboard/profiles", label: "Customers", icon: Users },
+  { href: "/dashboard/integrations", label: "Channels", icon: Link2 },
 ];
-
-const BREADCRUMB_MAP: Record<string, string> = {
-  "/dashboard": "Command Center",
-  "/dashboard/admin": "System Admin",
-  "/dashboard/executive": "Executive View",
-  "/dashboard/shadow-tickets": "Shadow Tickets",
-  "/dashboard/qa-review": "QA Review",
-  "/dashboard/profiles": "Golden Profiles",
-  "/dashboard/hitl": "HITL Queue",
-  "/dashboard/analytics": "Analytics",
-  "/dashboard/integrations": "Integrations",
-  "/dashboard/subscriptions": "Subscription",
-};
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
-  const [search, setSearch] = useState("");
   const [alertVisible, setAlertVisible] = useState(true);
   const [alertMessage, setAlertMessage] = useState("");
   const [pipelineStage, setPipelineStage] = useState(0);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const isMobile = useMediaQuery("(max-width: 768px)");
   const isTablet = useMediaQuery("(min-width: 769px) and (max-width: 1024px)");
+  const allowedRoutes = user ? ROLE_ROUTES[user.role as UserRole] || [] : [];
+  const canOpenSettings = allowedRoutes.includes("/dashboard/settings");
+  const topNavTabs = NAV_TABS.filter((tab) => allowedRoutes.includes(tab.href));
 
   // Auto-collapse sidebar on tablet
   useEffect(() => {
     if (isTablet) setCollapsed(true);
   }, [isTablet]);
-
-  // Close mobile menu on navigation
-  useEffect(() => {
-    setMobileMenuOpen(false);
-  }, [pathname]);
 
   // Auth guard
   useEffect(() => {
@@ -122,11 +107,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     const nextStage = pathname.includes("hitl")
       ? 4
       : pathname.includes("shadow-tickets")
-      ? 6
+      ? 3
       : pathname.includes("analytics")
-      ? 6
+      ? 5
       : pathname.includes("profiles")
       ? 2
+      : pathname.includes("qa-review")
+      ? 4
       : 0;
     const raf = requestAnimationFrame(() => setPipelineStage(nextStage));
     return () => cancelAnimationFrame(raf);
@@ -180,7 +167,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
               {/* Tabs — scrollable on all sizes */}
               <nav className="flex items-center gap-0.5 overflow-x-auto no-scrollbar whitespace-nowrap scroll-smooth shrink min-w-0 py-0.5">
-                {NAV_TABS.map((tab) => {
+                {topNavTabs.map((tab) => {
                   const isActive = pathname === tab.href ||
                     (tab.href !== "/dashboard" && pathname.startsWith(tab.href));
                   const Icon = tab.icon;
@@ -207,11 +194,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
             {/* Right section */}
             <div className="flex items-center gap-1 sm:gap-2 shrink-0">
-              <button className="hidden sm:flex items-center gap-1.5 px-2 sm:px-3 py-1.5 rounded-[var(--radius-sm)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)] transition-all text-xs font-medium">
-                <Settings className="w-3.5 h-3.5" />
-                <span className="hidden lg:inline">Settings</span>
-              </button>
-              <ThemeToggleCompact />
+              {isMobile && <ThemeToggleCompact />}
+              {isMobile && canOpenSettings && (
+                <Link
+                  href="/dashboard/settings"
+                  title="Settings"
+                  className={`p-2 rounded-[var(--radius-sm)] transition-all ${
+                    pathname === "/dashboard/settings"
+                      ? "text-[var(--accent-primary)] bg-[var(--accent-primary)]/8"
+                      : "text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)]"
+                  }`}
+                >
+                  <Settings className="w-4 h-4" />
+                </Link>
+              )}
               <button title="Notifications" className="relative p-2 rounded-[var(--radius-sm)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)] transition-all">
                 <Bell className="w-4 h-4" />
                 <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-[var(--accent-rose)] rounded-full" />
@@ -249,7 +245,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       {/* ── Mobile Bottom Navigation Bar ─────────────── */}
       {isMobile && (
         <nav className="mobile-bottom-nav" role="navigation" aria-label="Mobile navigation">
-          {NAV_TABS.map((tab) => {
+          {topNavTabs.slice(0, 5).map((tab) => {
             const isActive = pathname === tab.href ||
               (tab.href !== "/dashboard" && pathname.startsWith(tab.href));
             const Icon = tab.icon;
@@ -265,4 +261,3 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     </div>
   );
 }
-

@@ -196,6 +196,28 @@ class IntegrationSource(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
 
 
+class PlatformAPIConnection(Base):
+    """Executive-managed live platform API credentials for complaint polling."""
+    __tablename__ = "platform_api_connections"
+    __table_args__ = (UniqueConstraint("tenant_id", "platform_slug", "account_identifier", name="uq_platform_account"),)
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True, default=lambda: new_id("pac"))
+    tenant_id: Mapped[str] = mapped_column(ForeignKey("tenants.id", ondelete="CASCADE"), index=True, nullable=False)
+    platform_name: Mapped[str] = mapped_column(String(128), nullable=False)
+    platform_slug: Mapped[str] = mapped_column(String(128), index=True, nullable=False)
+    account_identifier: Mapped[str] = mapped_column(String(512), nullable=False)
+    credentials_enc: Mapped[str] = mapped_column(Text, nullable=False)
+    active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    poll_interval_seconds: Mapped[int] = mapped_column(Integer, default=300, nullable=False)
+    last_polled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    poll_cursor: Mapped[str | None] = mapped_column(String(512))
+    integration_source_id: Mapped[str | None] = mapped_column(ForeignKey("integration_sources.id", ondelete="SET NULL"), index=True)
+    monitor_config_id: Mapped[str | None] = mapped_column(ForeignKey("social_monitor_configs.id", ondelete="SET NULL"), index=True)
+    last_error: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False)
+
+
 # ── Customer Profile ─────────────────────────────────────────
 class CustomerProfile(Base):
     __tablename__ = "customer_profiles"

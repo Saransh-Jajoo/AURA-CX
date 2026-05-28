@@ -287,6 +287,33 @@ export async function updatePlatformConnection(data: Record<string, unknown>) {
   );
 }
 
+export async function fetchDynamicPlatformConnections() {
+  return request<{ connections: import("./types").DynamicPlatformConnection[]; total: number }>(
+    "/api/v1/settings/platform-api-connections"
+  );
+}
+
+export async function createDynamicPlatformConnection(data: Record<string, unknown>) {
+  return request<{ status: string; connection: import("./types").DynamicPlatformConnection }>(
+    "/api/v1/settings/platform-api-connections",
+    { method: "POST", body: JSON.stringify(data) }
+  );
+}
+
+export async function updateDynamicPlatformConnection(connectionId: string, data: Record<string, unknown>) {
+  return request<{ status: string; connection: import("./types").DynamicPlatformConnection }>(
+    `/api/v1/settings/platform-api-connections/${connectionId}`,
+    { method: "PATCH", body: JSON.stringify(data) }
+  );
+}
+
+export async function deleteDynamicPlatformConnection(connectionId: string) {
+  return request<{ status: string; id: string }>(
+    `/api/v1/settings/platform-api-connections/${connectionId}`,
+    { method: "DELETE" }
+  );
+}
+
 // ── Voice / Call Recordings ─────────────────────────────────
 export async function fetchCalls(params?: { status?: string }) {
   const qs = params?.status ? `?status=${params.status}` : "";

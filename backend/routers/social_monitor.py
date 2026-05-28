@@ -21,8 +21,7 @@ from security import assert_tenant, require_roles
 
 router = APIRouter()
 
-ALLOWED_PLATFORMS = {"x", "email", "threads"}
-ALLOWED_TARGET_TYPES = {"mention", "hashtag", "keyword", "inbox"}
+ALLOWED_TARGET_TYPES = {"mention", "hashtag", "keyword", "inbox", "account"}
 
 
 # ── Schemas ───────────────────────────────────────────────────
@@ -38,8 +37,8 @@ class MonitorConfigIn(BaseModel):
     @classmethod
     def validate_platform(cls, v: str) -> str:
         v = v.lower().strip()
-        if v not in ALLOWED_PLATFORMS:
-            raise ValueError(f"platform must be one of: {', '.join(sorted(ALLOWED_PLATFORMS))}")
+        if not v or len(v) > 128 or not all(ch.isalnum() or ch in {"_", "-"} for ch in v):
+            raise ValueError("platform must be a valid platform slug")
         return v
 
     @field_validator("target_type")

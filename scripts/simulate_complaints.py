@@ -7,6 +7,7 @@ and the Human-in-the-Loop copilot draft interface.
 """
 
 import json
+import os
 import sys
 import urllib.request
 import urllib.parse
@@ -56,6 +57,21 @@ COMPLAINTS = [
 ]
 
 
+def get_environment():
+    environment = os.getenv("ENVIRONMENT") or os.getenv("AURA_ENV") or os.getenv("NODE_ENV")
+    if environment:
+        return environment
+    env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env")
+    try:
+        with open(env_path, "r", encoding="utf-8") as env_file:
+            for line in env_file:
+                if line.strip().startswith("ENVIRONMENT="):
+                    return line.split("=", 1)[1].strip().strip('"').strip("'")
+    except OSError:
+        pass
+    return "development"
+
+
 def make_request(url, method="GET", data=None, headers=None):
     if headers is None:
         headers = {}
@@ -89,6 +105,12 @@ def make_request(url, method="GET", data=None, headers=None):
 
 
 def main():
+    environment = get_environment()
+    if environment.lower() == "production":
+        print("[Blocked] The complaint simulator is disabled in production.")
+        print("Set ENVIRONMENT=development locally to run simulated ingestion.")
+        sys.exit(2)
+
     print("=" * 60)
     print("           AURA-CX INGESTION SIMULATOR")
     print("=" * 60)

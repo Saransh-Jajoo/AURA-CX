@@ -16,9 +16,6 @@ from security import assert_tenant, hash_password, require_roles, verify_passwor
 
 router = APIRouter()
 
-ALLOWED_PLATFORMS = {"x", "reddit", "gmail", "whatsapp", "web_form"}
-
-
 class IntegrationSourceIn(BaseModel):
     platform: str
     identifier: str = Field(min_length=1, max_length=512)
@@ -30,8 +27,8 @@ class IntegrationSourceIn(BaseModel):
     @classmethod
     def validate_platform(cls, value: str) -> str:
         value = value.lower().strip()
-        if value not in ALLOWED_PLATFORMS:
-            raise ValueError("platform must be x, reddit, gmail, whatsapp, or web_form")
+        if not value or len(value) > 128 or not all(ch.isalnum() or ch in {"_", "-"} for ch in value):
+            raise ValueError("platform must be a valid platform slug")
         return value
 
 
@@ -74,7 +71,7 @@ async def list_integrations(
 @router.post("/integrations")
 async def add_integration(
     body: IntegrationSourceIn,
-    user: Annotated[User, Depends(require_roles("tenant_admin"))],
+    user: Annotated[User, Depends(require_roles("tenant_admin", "executive"))],
     session: Annotated[AsyncSession, Depends(get_session)],
 ):
     tenant_id = assert_tenant(user, None)
@@ -99,7 +96,7 @@ async def add_integration(
 async def update_integration(
     source_id: str,
     body: IntegrationSourceIn,
-    user: Annotated[User, Depends(require_roles("tenant_admin"))],
+    user: Annotated[User, Depends(require_roles("tenant_admin", "executive"))],
     session: Annotated[AsyncSession, Depends(get_session)],
 ):
     source = await session.get(IntegrationSource, source_id)
@@ -118,7 +115,7 @@ async def update_integration(
 @router.delete("/integrations/{source_id}")
 async def remove_integration(
     source_id: str,
-    user: Annotated[User, Depends(require_roles("tenant_admin"))],
+    user: Annotated[User, Depends(require_roles("tenant_admin", "executive"))],
     session: Annotated[AsyncSession, Depends(get_session)],
 ):
     source = await session.get(IntegrationSource, source_id)

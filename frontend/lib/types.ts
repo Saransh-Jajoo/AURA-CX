@@ -5,12 +5,13 @@
 
 // ── Ticket / Live Feed ───────────────────────────────────────
 export type TicketStatus = "new" | "in_progress" | "awaiting_reply" | "resolved" | "escalated";
+export type KnownChannel = "x" | "reddit" | "gmail" | "whatsapp" | "web_form" | "voice";
 
 export interface Ticket {
   id: string;
   tenant_id?: string;
   profile_id?: string | null;
-  channel: "x" | "reddit" | "gmail" | "whatsapp" | "web_form" | "voice";
+  channel: KnownChannel | string;
   customer_name: string;
   customer_handle: string;
   message: string;
@@ -46,7 +47,7 @@ export interface KPIMetrics {
 // ── HITL Queue Item ──────────────────────────────────────────
 export interface HITLItem {
   id: string;
-  channel: "x" | "reddit" | "gmail" | "whatsapp" | "web_form" | "voice";
+  channel: KnownChannel | string;
   customer_name: string;
   customer_handle: string;
   message: string;
@@ -86,7 +87,7 @@ export interface GoldenProfile {
 }
 
 export interface ProfileInteraction {
-  channel: "x" | "reddit" | "gmail" | "whatsapp" | "web_form" | "voice";
+  channel: KnownChannel | string;
   handle: string;
   message: string;
   sentiment: string;
@@ -349,6 +350,22 @@ export interface PlatformConnections {
   reddit: RedditPlatformStatus;
   gmail: GmailPlatformStatus;
   threads: ThreadsPlatformStatus;
+}
+
+export interface DynamicPlatformConnection {
+  id: string;
+  tenant_id: string;
+  platform_name: string;
+  platform_slug: string;
+  account_identifier: string;
+  credential_fields: string[];
+  credentials_configured: boolean;
+  active: boolean;
+  poll_interval_seconds: number;
+  last_polled_at?: string | null;
+  last_error?: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 // ── Compliance / Audit ──────────────────────────────────────

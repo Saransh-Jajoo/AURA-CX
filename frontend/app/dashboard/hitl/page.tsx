@@ -448,7 +448,7 @@ export default function HITLPage() {
                                 key={i}
                                 className="px-2.5 py-1 rounded-[var(--radius-sm)] text-[10px] bg-[var(--accent-primary)]/8 text-[var(--accent-primary)] border border-[var(--accent-primary)]/15"
                               >
-                                {s}
+                                {typeof s === "string" ? s : String(s["title"] || s["source"] || s["id"] || `Source ${i + 1}`)}
                               </span>
                             ))}
                           </div>

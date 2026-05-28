@@ -183,117 +183,15 @@ def process_voice_transcript(call_id: str, tenant_id: str):
 # ── Social Monitor Tasks ──────────────────────────────────────
 @celery_app.task(name="tasks.social.poll_mentions", bind=True, max_retries=2)
 def poll_social_mentions(self):
-    """Periodic task: poll all active social monitor configs for new mentions."""
+    """Periodic task: poll tenant-scoped dynamic platform connections."""
     import asyncio
-    import logging
     from database import SessionLocal
 
-    logger = logging.getLogger("aura_cx.social_poll")
-
     async def _poll():
-        from datetime import datetime, timezone
-        from sqlalchemy import select
-        from models import SocialMention, SocialMonitorConfig
-        from services.social_monitor import poll_x_mentions, poll_email_inbox, poll_threads_mentions
-        from services.complaint_classifier import classify_mention
+        from services.platform_polling import poll_due_platform_connections
 
         async with SessionLocal() as db:
-            configs = (
-                await db.scalars(
-                    select(SocialMonitorConfig).where(SocialMonitorConfig.active.is_(True))
-                )
-            ).all()
-
-            total_new = 0
-            total_complaints = 0
-
-            for config in configs:
-                try:
-                    # Build query and poll the platform
-                    if config.platform == "x":
-                        query = config.target_value
-                        if config.target_type == "mention" and not query.startswith("@"):
-                            query = f"@{query}"
-                        elif config.target_type == "hashtag" and not query.startswith("#"):
-                            query = f"#{query}"
-                        result = await poll_x_mentions(
-                            query, since_id=config.poll_cursor
-                        )
-
-                    elif config.platform == "email":
-                        result = poll_email_inbox(since_uid=config.poll_cursor)
-
-                    elif config.platform == "threads":
-                        result = await poll_threads_mentions(
-                            since_timestamp=config.poll_cursor
-                        )
-                    else:
-                        continue
-
-                    posts = result.get("posts", [])
-                    newest_id = result.get("newest_id")
-
-                    for post in posts:
-                        # Deduplicate by external_id
-                        exists = await db.scalar(
-                            select(SocialMention.id).where(
-                                SocialMention.external_id == str(post["id"]),
-                                SocialMention.platform == config.platform,
-                                SocialMention.tenant_id == config.tenant_id,
-                            )
-                        )
-                        if exists:
-                            continue
-
-                        # NLP classification
-                        classification = await classify_mention(
-                            post.get("text", ""),
-                            config.platform,
-                            post.get("author_handle", ""),
-                        )
-
-                        mention = SocialMention(
-                            tenant_id=config.tenant_id,
-                            monitor_config_id=config.id,
-                            platform=config.platform,
-                            external_id=str(post["id"]),
-                            author_handle=post.get("author_handle", "unknown"),
-                            author_name=post.get("author_name"),
-                            content=post.get("text", "")[:10000],
-                            content_url=post.get("url"),
-                            is_complaint=classification["is_complaint"],
-                            complaint_confidence=classification["confidence"],
-                            complaint_category=classification.get("category"),
-                            sentiment=classification["sentiment"],
-                            sentiment_score=classification["sentiment_score"],
-                            nlp_summary=classification.get("summary"),
-                            detected_language=classification.get("detected_language", "en"),
-                            raw_metadata=post,
-                        )
-                        db.add(mention)
-                        total_new += 1
-                        if classification["is_complaint"]:
-                            total_complaints += 1
-
-                    # Update cursor
-                    if newest_id:
-                        config.poll_cursor = str(newest_id)
-                    config.last_polled_at = datetime.now(timezone.utc)
-
-                except Exception:
-                    logger.exception(
-                        "Social poll failed for config %s (%s/%s)",
-                        config.id, config.platform, config.target_value,
-                    )
-
-            if total_new:
-                await db.commit()
-
-            return {
-                "configs_polled": len(configs),
-                "new_mentions": total_new,
-                "new_complaints": total_complaints,
-            }
+            return await poll_due_platform_connections(db)
 
     try:
         return asyncio.run(_poll())

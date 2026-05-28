@@ -14,6 +14,17 @@ from models import Base, Tenant, User
 engine = create_async_engine(settings.DATABASE_URL, pool_pre_ping=True)
 SessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
+DEMO_LOGIN_PASSWORD = "AuraBank@2026"
+DEMO_USERS = [
+    ("superadmin@aurabank.test", "Platform Super Admin", "super_admin", "SA", "Platform Operations"),
+    ("admin@aurabank.test", "Bank Tenant Admin", "tenant_admin", "TA", "Bank Administration"),
+    ("executive@aurabank.test", "Executive Leader", "executive", "EL", "Executive Office"),
+    ("manager@aurabank.test", "Operations Manager", "manager", "OM", "Customer Operations"),
+    ("agent@aurabank.test", "Bank Support Agent", "support_agent", "BA", "Complaint Desk"),
+    ("reviewer@aurabank.test", "QA Reviewer", "qa_reviewer", "QR", "Quality Review"),
+    ("analyst@aurabank.test", "Read Only Analyst", "read_only_analyst", "RA", "Risk Analytics"),
+]
+
 
 def _hash_password(password: str) -> str:
     return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
@@ -74,6 +85,20 @@ async def init_db() -> None:
             except Exception:  # noqa: BLE001
                 pass  # column already exists or table doesn't exist yet
 
+        # Dynamic platform names can exceed the original fixed-channel limits.
+        for table_name, col_name in [
+            ("integration_sources", "platform"),
+            ("social_monitor_configs", "platform"),
+            ("social_mentions", "platform"),
+            ("tickets", "channel"),
+        ]:
+            try:
+                await conn.execute(
+                    _sql_text(f"ALTER TABLE {table_name} ALTER COLUMN {col_name} TYPE VARCHAR(128)")
+                )
+            except Exception:  # noqa: BLE001
+                pass
+
         # Ticket: private channel resolution fields
         _ticket_columns = [
             ("resolved_by", "VARCHAR(64)"),
@@ -125,5 +150,29 @@ async def init_db() -> None:
                         avatar=(initials or "TA")[:4],
                     )
                 )
+
+        for email, name, role, avatar, department in DEMO_USERS:
+            existing = await session.scalar(select(User).where(User.email == email))
+            if existing is None:
+                session.add(
+                    User(
+                        tenant_id=settings.BOOTSTRAP_TENANT_ID,
+                        email=email,
+                        name=name,
+                        hashed_password=_hash_password(DEMO_LOGIN_PASSWORD),
+                        role=role,
+                        avatar=avatar,
+                        department=department,
+                        active=True,
+                    )
+                )
+            else:
+                existing.tenant_id = settings.BOOTSTRAP_TENANT_ID
+                existing.name = name
+                existing.role = role
+                existing.avatar = avatar
+                existing.department = department
+                existing.active = True
+                existing.hashed_password = _hash_password(DEMO_LOGIN_PASSWORD)
 
         await session.commit()

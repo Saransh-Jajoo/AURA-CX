@@ -4,8 +4,7 @@ import React from "react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import {
-  Download, ShieldCheck, Fingerprint, Brain, UserCheck, Route, Radar, RotateCcw,
-  Timer, Phone, Megaphone,
+  Download, ShieldCheck, Fingerprint, Brain, UserCheck, Timer,
 } from "lucide-react";
 
 /* ═══════════════════════════════════════════════════════════
@@ -23,17 +22,12 @@ export interface PipelineStage {
 }
 
 const STAGES: PipelineStage[] = [
-  { id: "ingestion", label: "Live Ingestion", shortLabel: "Ingest", icon: Download, color: "var(--pipeline-ingestion)" },
-  { id: "scrub", label: "Scrubbing Gateway", shortLabel: "Scrub", icon: ShieldCheck, color: "var(--pipeline-cognition)" },
-  { id: "identity", label: "Golden Profile", shortLabel: "Profile", icon: Fingerprint, color: "var(--pipeline-hitl)" },
-  { id: "rag", label: "Hybrid RAG", shortLabel: "RAG", icon: Brain, color: "var(--pipeline-feedback)" },
-  { id: "hitl", label: "HITL Gateway", shortLabel: "HITL", icon: UserCheck, color: "var(--accent-teal)" },
-  { id: "routing", label: "Action Routing", shortLabel: "Route", icon: Route, color: "var(--accent-amber)" },
-  { id: "shadow", label: "Shadow Tickets", shortLabel: "Shadow", icon: Radar, color: "var(--accent-rose)" },
-  { id: "feedback", label: "RLHF Loop", shortLabel: "RLHF", icon: RotateCcw, color: "var(--accent-emerald)" },
-  { id: "sla", label: "SLA Engine", shortLabel: "SLA", icon: Timer, color: "var(--accent-sky)" },
-  { id: "voice", label: "Voice Agent", shortLabel: "Voice", icon: Phone, color: "var(--accent-secondary)" },
-  { id: "campaign", label: "Campaign Engine", shortLabel: "Campaign", icon: Megaphone, color: "var(--accent-primary)" },
+  { id: "intake", label: "Complaint Intake", shortLabel: "Intake", icon: Download, color: "var(--pipeline-ingestion)" },
+  { id: "privacy", label: "PII & Risk Check", shortLabel: "Risk", icon: ShieldCheck, color: "var(--pipeline-cognition)" },
+  { id: "customer", label: "Customer Match", shortLabel: "Customer", icon: Fingerprint, color: "var(--pipeline-hitl)" },
+  { id: "policy", label: "Policy Lookup", shortLabel: "Policy", icon: Brain, color: "var(--pipeline-feedback)" },
+  { id: "review", label: "Worker Review", shortLabel: "Review", icon: UserCheck, color: "var(--accent-teal)" },
+  { id: "sla", label: "SLA Tracking", shortLabel: "SLA", icon: Timer, color: "var(--accent-sky)" },
 ];
 
 interface PipelineTrackerProps {
