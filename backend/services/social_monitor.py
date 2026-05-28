@@ -108,10 +108,11 @@ def poll_email_inbox(
         {"posts": [{"id", "text", "author_handle", "author_name", "subject", "created_at"}], "newest_id": str}
     """
     credentials = credentials or {}
-    host = str(credentials.get("imap_host") or credentials.get("host") or settings.IMAP_HOST or "")
+    host = str(credentials.get("imap_host") or credentials.get("host") or settings.IMAP_HOST or "").strip()
     port = int(credentials.get("imap_port") or credentials.get("port") or settings.IMAP_PORT)
-    user = str(credentials.get("imap_user") or credentials.get("user") or credentials.get("username") or settings.IMAP_USER or "")
-    password = str(credentials.get("imap_password") or credentials.get("password") or settings.IMAP_PASSWORD or "")
+    user = str(credentials.get("imap_user") or credentials.get("user") or credentials.get("username") or settings.IMAP_USER or "").strip()
+    password = str(credentials.get("imap_password") or credentials.get("password") or settings.IMAP_PASSWORD or "").strip()
+    folder = folder.strip()
     use_ssl = credentials.get("imap_use_ssl", credentials.get("use_ssl", settings.IMAP_USE_SSL))
     if isinstance(use_ssl, str):
         use_ssl = use_ssl.lower() not in {"false", "0", "no"}
@@ -185,9 +186,9 @@ def poll_email_inbox(
 
     except MonitorError:
         raise
-    except Exception:
+    except Exception as exc:
         logger.exception("Email IMAP polling failed")
-        return {"posts": [], "newest_id": since_uid}
+        raise MonitorError(f"Email IMAP polling failed: {exc}") from exc
 
 
 # ── Threads (Meta) ───────────────────────────────────────────

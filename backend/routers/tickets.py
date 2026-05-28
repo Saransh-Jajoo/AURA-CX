@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import hmac
+import re
 import secrets
 from datetime import datetime, timedelta, timezone
+from email.utils import parseaddr
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -14,10 +16,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import settings
 from database import get_session
-from models import RLHFSignal, Ticket, TenantConfig, TicketTimelineEvent, User
+from models import CustomerProfile, RLHFSignal, Ticket, TenantConfig, TicketMessage, TicketTimelineEvent, User
 from security import assert_tenant, require_roles
 from services.ai_providers import tenant_provider_configs
 from services import ai_service
+from services.notification import (
+    build_resolution_email_html,
+    delivery_config_from_tenant,
+    send_private_channel_message,
+)
 from services.realtime import manager, ticket_to_dict
 
 router = APIRouter()
@@ -28,6 +35,10 @@ class EditRequest(BaseModel):
     signal_type: str = "corrective"
     original_draft: str = ""
     edited_draft: str = Field(min_length=1)
+
+
+class ApproveRequest(BaseModel):
+    response_text: str | None = Field(default=None, min_length=1, max_length=4000)
 
 
 class HandoffRequest(BaseModel):
@@ -106,6 +117,92 @@ async def _get_scoped_ticket(session: AsyncSession, user: User, ticket_id: str) 
         raise HTTPException(status_code=404, detail="Ticket not found")
     assert_tenant(user, ticket.tenant_id)
     return ticket
+
+
+EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+def _extract_email(value: str | None) -> str | None:
+    if not value:
+        return None
+    _, parsed = parseaddr(value.strip())
+    candidate = (parsed or value.strip()).lower()
+    return candidate if EMAIL_RE.match(candidate) else None
+
+
+async def _ticket_email_recipient(session: AsyncSession, ticket: Ticket) -> str | None:
+    if ticket.private_channel == "email":
+        private_email = _extract_email(ticket.private_channel_address)
+        if private_email:
+            return private_email
+
+    if ticket.profile_id:
+        profile = await session.get(CustomerProfile, ticket.profile_id)
+        if profile:
+            profile_email = _extract_email(profile.email)
+            if profile_email:
+                return profile_email
+            for secondary in profile.secondary_emails or []:
+                secondary_email = _extract_email(str(secondary))
+                if secondary_email:
+                    return secondary_email
+
+    handle_email = _extract_email(ticket.customer_handle)
+    if handle_email:
+        return handle_email
+
+    metadata = ticket.event_metadata or {}
+    provider_metadata = metadata.get("provider_metadata") or {}
+    for key in ("email", "sender_email", "from", "reply_to"):
+        metadata_email = _extract_email(str(provider_metadata.get(key) or metadata.get(key) or ""))
+        if metadata_email:
+            return metadata_email
+    return None
+
+
+async def _dispatch_email_resolution(
+    session: AsyncSession,
+    *,
+    ticket: Ticket,
+    user: User,
+    response_text: str,
+) -> bool:
+    recipient = await _ticket_email_recipient(session, ticket)
+    if not recipient:
+        if ticket.channel in {"gmail", "email", "web_form"}:
+            raise HTTPException(status_code=400, detail="No customer email address found for this ticket")
+        return False
+
+    config = await session.scalar(select(TenantConfig).where(TenantConfig.tenant_id == ticket.tenant_id))
+    sent = await send_private_channel_message(
+        channel="email",
+        address=recipient,
+        subject=f"Re: Your support request {ticket.id}",
+        text_body=response_text,
+        html_body=build_resolution_email_html(
+            customer_name=ticket.customer_name,
+            ticket_summary=ticket.message,
+            resolution_note=response_text,
+            csat_url=f"{settings.FRONTEND_URL.rstrip('/')}/resolve/{ticket.private_channel_token}" if ticket.private_channel_token else settings.FRONTEND_URL.rstrip("/"),
+        ),
+        delivery_config=delivery_config_from_tenant(config),
+    )
+    if not sent:
+        raise HTTPException(status_code=502, detail="Email delivery failed or SMTP is not configured")
+    if sent:
+        session.add(
+            TicketMessage(
+                ticket_id=ticket.id,
+                tenant_id=ticket.tenant_id,
+                sender_role="agent",
+                sender_name=user.name,
+                content=response_text,
+                is_internal=False,
+            )
+        )
+        ticket.private_channel = ticket.private_channel or "email"
+        ticket.private_channel_address = ticket.private_channel_address or recipient
+    return sent
 
 
 @router.get("/tickets")
@@ -239,9 +336,15 @@ async def approve_ticket(
     ticket_id: str,
     user: Annotated[User, Depends(require_roles("tenant_admin", "manager", "support_agent", "qa_reviewer"))],
     session: Annotated[AsyncSession, Depends(get_session)],
+    body: ApproveRequest | None = None,
 ):
     ticket = await _get_scoped_ticket(session, user, ticket_id)
+    response_text = (body.response_text if body and body.response_text else ticket.ai_draft or "").strip()
+    if not response_text:
+        raise HTTPException(status_code=400, detail="No AI draft or response text available to send")
     previous = ticket.status
+    ticket.ai_draft = response_text
+    notification_sent = await _dispatch_email_resolution(session, ticket=ticket, user=user, response_text=response_text)
     ticket.status = "resolved"
     # FIX: actually record when the ticket was resolved (was missing before)
     ticket.resolved_at = datetime.now(timezone.utc)
@@ -253,13 +356,21 @@ async def approve_ticket(
                 ticket_id=ticket.id,
                 user_id=user.id,
                 signal_type="positive",
-                original_draft=ticket.ai_draft,
+                original_draft=response_text,
             )
         )
-    _record_timeline(session, ticket=ticket, actor=user, event_type="hitl.approved", previous_status=previous, new_status=ticket.status)
+    _record_timeline(
+        session,
+        ticket=ticket,
+        actor=user,
+        event_type="hitl.approved",
+        previous_status=previous,
+        new_status=ticket.status,
+        metadata={"notification_channel": "email", "notification_sent": notification_sent},
+    )
     await session.commit()
     await manager.broadcast(ticket.tenant_id, {"type": "ticket_updated", "ticket": ticket_to_dict(ticket)})
-    return {"ticket_id": ticket.id, "status": "approved", "action": "dispatched", "rlhf_signal": "positive"}
+    return {"ticket_id": ticket.id, "status": "approved", "action": "dispatched", "rlhf_signal": "positive", "notification_sent": notification_sent}
 
 
 @router.post("/tickets/{ticket_id}/edit")
@@ -273,6 +384,7 @@ async def edit_ticket(
     original = body.original_draft or ticket.ai_draft or ""
     previous = ticket.status
     ticket.ai_draft = body.edited_draft
+    notification_sent = await _dispatch_email_resolution(session, ticket=ticket, user=user, response_text=body.edited_draft)
     ticket.status = "resolved"
     # FIX: actually record resolution time
     ticket.resolved_at = datetime.now(timezone.utc)
@@ -287,7 +399,15 @@ async def edit_ticket(
             edited_draft=body.edited_draft,
         )
     )
-    _record_timeline(session, ticket=ticket, actor=user, event_type="hitl.edited", previous_status=previous, new_status=ticket.status, metadata={"signal_type": body.signal_type})
+    _record_timeline(
+        session,
+        ticket=ticket,
+        actor=user,
+        event_type="hitl.edited",
+        previous_status=previous,
+        new_status=ticket.status,
+        metadata={"signal_type": body.signal_type, "notification_channel": "email", "notification_sent": notification_sent},
+    )
     await session.commit()
     await manager.broadcast(ticket.tenant_id, {"type": "ticket_updated", "ticket": ticket_to_dict(ticket)})
     return await ai_service.record_rlhf_signal(

@@ -27,6 +27,76 @@ from services.social_monitor import (
 logger = logging.getLogger("aura_cx.platform_polling")
 
 
+def _banking_complaint_fallback(content: str) -> dict[str, Any] | None:
+    lowered = content.lower()
+    financial_terms = (
+        "amount",
+        "balance",
+        "bank",
+        "card",
+        "charged",
+        "credited",
+        "debit",
+        "debited",
+        "deducted",
+        "emi",
+        "loan",
+        "money",
+        "paid",
+        "payment",
+        "refund",
+        "reversal",
+        "transaction",
+        "transfer",
+        "upi",
+        "withdrawal",
+    )
+    problem_terms = (
+        "bug",
+        "complaint",
+        "compliant",
+        "complent",
+        "dispute",
+        "error",
+        "failed",
+        "fraud",
+        "issue",
+        "locked",
+        "not credited",
+        "not showing",
+        "not working",
+        "problem",
+        "unauthorized",
+        "wrong",
+    )
+    has_financial_context = any(term in lowered for term in financial_terms)
+    has_problem_signal = any(term in lowered for term in problem_terms)
+
+    if not (has_financial_context and has_problem_signal):
+        return None
+
+    if any(term in lowered for term in ("fraud", "unauthorized", "deducted", "debited", "charged")):
+        category = "billing"
+        sentiment_score = -0.72
+    elif any(term in lowered for term in ("bug", "error", "not working", "not showing", "failed")):
+        category = "app_bug"
+        sentiment_score = -0.62
+    else:
+        category = "service_failure"
+        sentiment_score = -0.55
+
+    return {
+        "is_complaint": True,
+        "confidence": 0.86,
+        "category": category,
+        "sentiment": "frustrated",
+        "sentiment_score": sentiment_score,
+        "summary": "Banking complaint detected by deterministic fallback",
+        "detected_language": "en",
+        "suggested_action": "Create a ticket and verify the customer's transaction details.",
+    }
+
+
 def _load_credentials(connection: PlatformAPIConnection) -> dict[str, Any]:
     return json.loads(decrypt_value(connection.credentials_enc))
 
@@ -88,20 +158,23 @@ async def _poll_connection_api(connection: PlatformAPIConnection, credentials: d
 
 async def _classify_safely(content: str, platform: str, author_handle: str) -> dict[str, Any]:
     try:
-        return await classify_mention(content, platform, author_handle)
+        classification = await classify_mention(content, platform, author_handle)
     except Exception:  # noqa: BLE001
-        lowered = content.lower()
-        complaint_terms = ("failed", "error", "issue", "problem", "complaint", "refund", "charged", "locked", "not working")
-        is_complaint = any(term in lowered for term in complaint_terms)
-        return {
-            "is_complaint": is_complaint,
-            "confidence": 0.72 if is_complaint else 0.2,
-            "category": "general_dissatisfaction" if is_complaint else None,
-            "sentiment": "frustrated" if is_complaint else "neutral",
-            "sentiment_score": -0.45 if is_complaint else 0.0,
-            "summary": "Heuristic classification used because AI classification was unavailable",
+        classification = {
+            "is_complaint": False,
+            "confidence": 0.0,
+            "category": None,
+            "sentiment": "neutral",
+            "sentiment_score": 0.0,
+            "summary": "Classification failed; deterministic fallback checked",
             "detected_language": "en",
+            "suggested_action": None,
         }
+
+    fallback = _banking_complaint_fallback(content)
+    if fallback and (not classification.get("is_complaint") or float(classification.get("confidence", 0.0)) < 0.5):
+        return fallback
+    return classification
 
 
 async def _runtime_rows(

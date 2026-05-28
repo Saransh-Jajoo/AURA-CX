@@ -105,6 +105,12 @@ class Settings(BaseSettings):
     TWILIO_AUTH_TOKEN: str = ""
     TWILIO_PHONE_NUMBER: str = ""
 
+    # Email delivery for HITL approvals / private threads.
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASS: str = ""
+
     # ── Campaign Engine ──────────────────────────────────────
     SENTIMENT_DROP_THRESHOLD: float = -0.40
     CHURN_RISK_THRESHOLD: float = 0.65

@@ -66,7 +66,7 @@ services:
         condition: service_started
     environment:
       # ── Core ──────────────────────────────────────────────
-      USE_MOCK_DATA: "false"
+      USE_MOCK_DATA: ${USE_MOCK_DATA:-false}
       ENVIRONMENT: production
       FRONTEND_URL: http://localhost:3000
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:?POSTGRES_USER must be set}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/aura_cx
@@ -91,7 +91,7 @@ services:
       CELERY_BROKER_URL: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD must be set}@redis:6379/1
       CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD must be set}@redis:6379/2
       # ── AI / Gemini ───────────────────────────────────────
-      GEMINI_API_KEY: ${GEMINI_API_KEY:?GEMINI_API_KEY must be set}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GEMINI_MODEL: ${GEMINI_MODEL:-gemini-1.5-pro-latest}
       GEMINI_EMBEDDING_MODEL: ${GEMINI_EMBEDDING_MODEL:-text-embedding-004}
       AI_PROVIDER: ${AI_PROVIDER:-gemini}
@@ -127,6 +127,10 @@ services:
       TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:?TWILIO_ACCOUNT_SID must be set}
       TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:?TWILIO_AUTH_TOKEN must be set}
       TWILIO_PHONE_NUMBER: ${TWILIO_PHONE_NUMBER:?TWILIO_PHONE_NUMBER must be set}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
       # ── Multilingual ──────────────────────────────────────
       SUPPORTED_LANGUAGES: ${SUPPORTED_LANGUAGES:-en,hi,mr,ta,bn,gu,te,kn,ml}
       # ── Social Monitor ────────────────────────────────────
@@ -157,8 +161,9 @@ services:
       CELERY_BROKER_URL: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD must be set}@redis:6379/1
       CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD must be set}@redis:6379/2
       SECRET_KEY: ${SECRET_KEY:?SECRET_KEY must be set}
+      WEBHOOK_SIGNING_SECRET: ${WEBHOOK_SIGNING_SECRET:?WEBHOOK_SIGNING_SECRET must be set}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:?ENCRYPTION_KEY must be set}
-      GEMINI_API_KEY: ${GEMINI_API_KEY:?GEMINI_API_KEY must be set}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GEMINI_MODEL: ${GEMINI_MODEL:-gemini-1.5-pro-latest}
       AI_PROVIDER: ${AI_PROVIDER:-gemini}
       AI_FALLBACK_ORDER: ${AI_FALLBACK_ORDER:-gemini,openai,anthropic,openrouter,mistral,ollama,self_hosted}
@@ -187,6 +192,11 @@ services:
     depends_on:
       - redis
     environment:
+      ENVIRONMENT: production
+      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY must be set}
+      WEBHOOK_SIGNING_SECRET: ${WEBHOOK_SIGNING_SECRET:?WEBHOOK_SIGNING_SECRET must be set}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?ENCRYPTION_KEY must be set}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD must be set}
       CELERY_BROKER_URL: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD must be set}@redis:6379/1
       CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD must be set}@redis:6379/2
       SOCIAL_MONITOR_POLL_INTERVAL: ${SOCIAL_MONITOR_POLL_INTERVAL:-300}

@@ -13,10 +13,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import settings
 from database import get_session
-from models import CustomerProfile, IntegrationSource, Ticket, User
+from models import CustomerProfile, IntegrationSource, TenantConfig, Ticket, User
 from routers.integrations import verify_webhook_source
 from security import assert_tenant, require_roles, verify_webhook_signature
 from services import ai_service
+from services.ai_providers import tenant_provider_configs
 from services.deduplication import get_dedup_service
 from services.realtime import manager, ticket_to_dict
 from services.scrubbing import scrub_text
@@ -194,6 +195,24 @@ async def process_webhook_payload(
     session.add(ticket)
     await session.flush()
     await assign_sla(session, ticket)
+    try:
+        config = await session.scalar(select(TenantConfig).where(TenantConfig.tenant_id == tenant_id))
+        draft = await ai_service.generate_draft(
+            tenant_id=tenant_id,
+            ticket=ticket_to_dict(ticket),
+            provider_configs=tenant_provider_configs(config),
+            preferred_provider=config.ai_provider if config else None,
+            fallback_order=config.ai_fallback_order if config else None,
+            brand_tone=config.brand_tone if config else None,
+        )
+        ticket.ai_draft = draft["draft"]
+        ticket.confidence = max(ticket.confidence, float(draft.get("confidence") or 0.0))
+        ticket.rag_sources = draft.get("rag_sources") or []
+    except Exception as exc:  # noqa: BLE001
+        ticket.event_metadata = {
+            **(ticket.event_metadata or {}),
+            "draft_generation_error": str(exc)[:500],
+        }
     await session.commit()
     await session.refresh(ticket)
     await manager.broadcast(tenant_id, {"type": "new_ticket", "ticket": ticket_to_dict(ticket)})

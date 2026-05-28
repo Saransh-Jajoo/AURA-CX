@@ -27,7 +27,10 @@ const API_BASE = typeof window !== "undefined"
 
 function getToken(): string | null {
   if (typeof window === "undefined") return null;
-  return localStorage.getItem("aura_token");
+  const stored = localStorage.getItem("aura_token");
+  if (stored) return stored;
+  const match = document.cookie.match(/(?:^|;\s*)aura_token=([^;]+)/);
+  return match ? decodeURIComponent(match[1]) : null;
 }
 
 function getRefreshToken(): string | null {
@@ -87,8 +90,11 @@ export async function fetchHITLQueue(): Promise<{ queue: HITLItem[]; total: numb
   return request("/api/v1/tickets/hitl");
 }
 
-export async function approveTicket(id: string) {
-  return request(`/api/v1/tickets/${id}/approve`, { method: "POST" });
+export async function approveTicket(id: string, responseText?: string) {
+  return request(`/api/v1/tickets/${id}/approve`, {
+    method: "POST",
+    body: responseText ? JSON.stringify({ response_text: responseText }) : undefined,
+  });
 }
 
 export async function escalateTicket(id: string) {
@@ -270,7 +276,7 @@ export async function updateTenantSettings(data: Record<string, unknown>) {
 }
 
 export async function updateBYOIConfig(data: Record<string, unknown>) {
-  return request("/api/v1/settings/byoi", {
+  return request<{ status: string; byoi: import("./types").BYOIStatus; changed_services: string[] }>("/api/v1/settings/byoi", {
     method: "PUT",
     body: JSON.stringify(data),
   });
@@ -355,7 +361,7 @@ export async function handoffToPrivateChannel(
   ticketId: string,
   data: {
     channel: PrivateChannel;
-    address: string;
+    address?: string;
     customer_name?: string;
     intro_message?: string;
   }

@@ -26,6 +26,7 @@ from models import (
 from security import assert_tenant, require_roles
 from services.ai_providers import provider_health, tenant_provider_configs
 from services.encryption import encrypt_value, decrypt_value
+from services.platform_polling import poll_due_platform_connections
 
 router = APIRouter()
 
@@ -121,22 +122,34 @@ def _config_status(config: TenantConfig | None) -> dict:
     """Return the BYOI configuration status without exposing secrets."""
     if config is None:
         return {"configured": False, "services": {}}
+    def status(active: bool, required: list[str], present: dict[str, bool], **extra) -> dict:
+        return {
+            "active": active,
+            "required_fields": required,
+            "missing_fields": [label for label, ok in present.items() if not ok],
+            **extra,
+        }
+
+    smtp_active = bool(config.smtp_host and config.smtp_user_enc and config.smtp_pass_enc)
+    twilio_active = bool(config.twilio_sid_enc and config.twilio_token_enc and config.twilio_phone)
+    pinecone_active = bool(config.pinecone_api_key_enc and config.pinecone_host)
+    storage_active = bool(config.storage_bucket and config.storage_provider)
     return {
         "configured": True,
         "services": {
-            "gemini": {"active": bool(config.gemini_api_key_enc), "masked_key": _mask_credential(decrypt_value(config.gemini_api_key_enc or ""))},
-            "openai": {"active": bool(config.openai_api_key_enc), "masked_key": _mask_credential(decrypt_value(config.openai_api_key_enc or ""))},
-            "anthropic": {"active": bool(config.anthropic_api_key_enc), "masked_key": _mask_credential(decrypt_value(config.anthropic_api_key_enc or ""))},
-            "mistral": {"active": bool(config.mistral_api_key_enc), "masked_key": _mask_credential(decrypt_value(config.mistral_api_key_enc or ""))},
-            "openrouter": {"active": bool(config.openrouter_api_key_enc), "masked_key": _mask_credential(decrypt_value(config.openrouter_api_key_enc or ""))},
-            "ollama": {"active": bool(config.ollama_base_url), "host": config.ollama_base_url or ""},
-            "self_hosted": {"active": bool(config.self_hosted_base_url), "host": config.self_hosted_base_url or ""},
-            "pinecone": {"active": bool(config.pinecone_api_key_enc), "host": config.pinecone_host or ""},
-            "chromadb": {"active": bool(config.chromadb_host), "host": config.chromadb_host or "", "port": config.chromadb_port},
-            "smtp": {"active": bool(config.smtp_host), "host": config.smtp_host or ""},
-            "twilio": {"active": bool(config.twilio_sid_enc), "phone": config.twilio_phone or ""},
-            "storage": {"active": bool(config.storage_bucket), "provider": config.storage_provider or "", "bucket": config.storage_bucket or ""},
-            "webhooks": {"active": bool(config.webhook_endpoints), "count": len(config.webhook_endpoints or {})},
+            "gemini": status(bool(config.gemini_api_key_enc), ["API key"], {"API key": bool(config.gemini_api_key_enc)}, masked_key=_mask_credential(decrypt_value(config.gemini_api_key_enc or ""))),
+            "openai": status(bool(config.openai_api_key_enc), ["API key"], {"API key": bool(config.openai_api_key_enc)}, masked_key=_mask_credential(decrypt_value(config.openai_api_key_enc or ""))),
+            "anthropic": status(bool(config.anthropic_api_key_enc), ["API key"], {"API key": bool(config.anthropic_api_key_enc)}, masked_key=_mask_credential(decrypt_value(config.anthropic_api_key_enc or ""))),
+            "mistral": status(bool(config.mistral_api_key_enc), ["API key"], {"API key": bool(config.mistral_api_key_enc)}, masked_key=_mask_credential(decrypt_value(config.mistral_api_key_enc or ""))),
+            "openrouter": status(bool(config.openrouter_api_key_enc), ["API key"], {"API key": bool(config.openrouter_api_key_enc)}, masked_key=_mask_credential(decrypt_value(config.openrouter_api_key_enc or ""))),
+            "ollama": status(bool(config.ollama_base_url), ["Base URL"], {"Base URL": bool(config.ollama_base_url)}, host=config.ollama_base_url or ""),
+            "self_hosted": status(bool(config.self_hosted_base_url), ["Base URL"], {"Base URL": bool(config.self_hosted_base_url)}, host=config.self_hosted_base_url or ""),
+            "pinecone": status(pinecone_active, ["API key", "Host URL"], {"API key": bool(config.pinecone_api_key_enc), "Host URL": bool(config.pinecone_host)}, host=config.pinecone_host or ""),
+            "chromadb": status(bool(config.chromadb_host), ["Host"], {"Host": bool(config.chromadb_host)}, host=config.chromadb_host or "", port=config.chromadb_port),
+            "smtp": status(smtp_active, ["Host", "Username", "Password"], {"Host": bool(config.smtp_host), "Username": bool(config.smtp_user_enc), "Password": bool(config.smtp_pass_enc)}, host=config.smtp_host or "", port=config.smtp_port, masked_user=_mask_credential(decrypt_value(config.smtp_user_enc or ""))),
+            "twilio": status(twilio_active, ["Account SID", "Auth Token", "Phone Number"], {"Account SID": bool(config.twilio_sid_enc), "Auth Token": bool(config.twilio_token_enc), "Phone Number": bool(config.twilio_phone)}, phone=config.twilio_phone or ""),
+            "storage": status(storage_active, ["Provider", "Bucket Name"], {"Provider": bool(config.storage_provider), "Bucket Name": bool(config.storage_bucket)}, provider=config.storage_provider or "", bucket=config.storage_bucket or ""),
+            "webhooks": status(bool(config.webhook_endpoints), ["Webhook endpoints"], {"Webhook endpoints": bool(config.webhook_endpoints)}, count=len(config.webhook_endpoints or {})),
         },
         "brand_tone_set": bool(config.brand_tone),
         "brand_examples_count": len(config.brand_examples or []),
@@ -469,24 +482,31 @@ async def update_byoi_config(
         config.chromadb_port = body.chromadb_port
     if body.smtp_host is not None:
         config.smtp_host = body.smtp_host or None
+        changed_services.append("smtp")
     if body.smtp_port is not None:
         config.smtp_port = body.smtp_port
+        changed_services.append("smtp")
     if body.smtp_user is not None:
         config.smtp_user_enc = encrypt_value(body.smtp_user) if body.smtp_user else None
         changed_services.append("smtp")
     if body.smtp_pass is not None:
         config.smtp_pass_enc = encrypt_value(body.smtp_pass) if body.smtp_pass else None
+        changed_services.append("smtp")
     if body.twilio_sid is not None:
         config.twilio_sid_enc = encrypt_value(body.twilio_sid) if body.twilio_sid else None
         changed_services.append("twilio")
     if body.twilio_token is not None:
         config.twilio_token_enc = encrypt_value(body.twilio_token) if body.twilio_token else None
+        changed_services.append("twilio")
     if body.twilio_phone is not None:
         config.twilio_phone = body.twilio_phone or None
+        changed_services.append("twilio")
     if body.storage_bucket is not None:
         config.storage_bucket = body.storage_bucket or None
+        changed_services.append("storage")
     if body.storage_provider is not None:
         config.storage_provider = body.storage_provider or None
+        changed_services.append("storage")
     if body.storage_credentials is not None:
         config.storage_credentials_enc = encrypt_value(body.storage_credentials) if body.storage_credentials else None
         changed_services.append("storage")
@@ -503,11 +523,11 @@ async def update_byoi_config(
         action="byoi.update",
         resource_type="tenant_config",
         resource_id=config.id,
-        details={"changed_services": changed_services},
+        details={"changed_services": sorted(set(changed_services))},
     ))
 
     await session.commit()
-    return {"status": "updated", "byoi": _config_status(config), "changed_services": changed_services}
+    return {"status": "updated", "byoi": _config_status(config), "changed_services": sorted(set(changed_services))}
 
 
 @router.get("/settings/platforms")
@@ -538,6 +558,32 @@ async def list_dynamic_platform_connections(
         )
     ).all()
     return {"connections": [_dynamic_platform_to_dict(item) for item in connections], "total": len(connections)}
+
+
+@router.post("/settings/platform-api-connections/poll-now")
+async def poll_dynamic_platform_connections_now(
+    user: Annotated[User, Depends(require_roles("executive"))],
+    session: Annotated[AsyncSession, Depends(get_session)],
+):
+    """Run platform polling immediately so users can verify new inbox/API connections."""
+    tenant_id = assert_tenant(user, None)
+    connections = (
+        await session.scalars(
+            select(PlatformAPIConnection).where(
+                PlatformAPIConnection.tenant_id == tenant_id,
+                PlatformAPIConnection.active.is_(True),
+            )
+        )
+    ).all()
+    for connection in connections:
+        connection.last_polled_at = None
+    await session.flush()
+    result = await poll_due_platform_connections(session)
+    return {
+        "status": "polled",
+        **result,
+        "connections": [_dynamic_platform_to_dict(item) for item in connections],
+    }
 
 
 @router.post("/settings/platform-api-connections")

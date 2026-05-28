@@ -22,6 +22,14 @@ class ClassificationError(RuntimeError):
 from services.ai_service import _extract_json
 
 
+def _has_usable_gemini_key() -> bool:
+    api_key = (settings.GEMINI_API_KEY or "").strip()
+    if not api_key:
+        return False
+    placeholders = ("your-", "replace-", "changeme", "placeholder")
+    return not any(marker in api_key.lower() for marker in placeholders)
+
+
 async def classify_mention(content: str, platform: str, author_handle: str = "") -> dict:
     """
     Classify a social media mention as complaint or not.
@@ -38,7 +46,7 @@ async def classify_mention(content: str, platform: str, author_handle: str = "")
             "suggested_action": str | None
         }
     """
-    if not settings.GEMINI_API_KEY:
+    if not _has_usable_gemini_key():
         raise ClassificationError("GEMINI_API_KEY is not configured")
 
     prompt = f"""You are a customer experience analyst. Analyze this social media post and determine if it is a CUSTOMER COMPLAINT about a product or service.

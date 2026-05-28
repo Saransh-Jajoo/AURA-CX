@@ -285,7 +285,10 @@ export interface VoiceAnalytics {
 // ── BYOI / Settings ─────────────────────────────────────────
 export interface BYOIServiceStatus {
   active: boolean;
+  required_fields?: string[];
+  missing_fields?: string[];
   masked_key?: string;
+  masked_user?: string;
   host?: string;
   port?: number;
   phone?: string;

@@ -31,12 +31,18 @@ const API_BASE = typeof window !== "undefined"
   : "http://backend:8000";
 const AuthContext = createContext<AuthState | undefined>(undefined);
 
+function readCookie(name: string): string | null {
+  if (typeof document === "undefined") return null;
+  const match = document.cookie.match(new RegExp(`(?:^|;\\s*)${name}=([^;]+)`));
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const readStoredAuth = () => {
     if (typeof window === "undefined") {
       return { user: null as User | null, token: null as string | null, loading: true };
     }
-    const saved = localStorage.getItem("aura_token");
+    const saved = localStorage.getItem("aura_token") || readCookie("aura_token");
     const savedUser = localStorage.getItem("aura_user");
     if (saved && savedUser) {
       try {

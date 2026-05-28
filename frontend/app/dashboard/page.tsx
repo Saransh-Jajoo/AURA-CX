@@ -12,7 +12,7 @@ import {
   generateAIDraft,
   approveTicket,
   editTicketWithRLHF,
-  createHandoffLink,
+  handoffToPrivateChannel,
 } from "@/lib/api";
 import { useLiveFeedStore } from "@/lib/live-feed-store";
 import { GoldenProfileStitching } from "@/components/golden-profile-stitching";
@@ -196,6 +196,7 @@ export default function CommandCenterPage() {
   const [detailEditing, setDetailEditing] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [actionMessage, setActionMessage] = useState<{ type: "success" | "error" | "info"; text: string } | null>(null);
 
   useEffect(() => {
     fetchTickets().then((d) => {
@@ -225,6 +226,7 @@ export default function CommandCenterPage() {
     setSelectedTicket(ticket);
     setDetailEditing(false);
     setDetailLoading(true);
+    setActionMessage(null);
     setDetailDraft(ticket.ai_draft || "");
 
     try {
@@ -243,8 +245,12 @@ export default function CommandCenterPage() {
           product: ticket.product,
         });
         setDetailDraft(draft.draft);
-      } catch {
+      } catch (e: unknown) {
         setDetailDraft("");
+        setActionMessage({
+          type: "error",
+          text: e instanceof Error ? `Draft generation failed: ${e.message}` : "Draft generation failed. Check AI provider configuration.",
+        });
       }
     }
 
@@ -255,10 +261,16 @@ export default function CommandCenterPage() {
   const handleApprove = async () => {
     if (!selectedTicket) return;
     setActionLoading("approve");
+    setActionMessage(null);
     try {
-      await approveTicket(selectedTicket.id);
+      await approveTicket(selectedTicket.id, detailDraft);
+      alert("Reply email sent to the customer and ticket marked resolved.");
       applyMessage({ type: "ticket_updated", ticket: { ...selectedTicket, status: "resolved" as TicketStatus, ai_draft: detailDraft } });
       setSelectedTicket(null);
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "Failed to send approval";
+      setActionMessage({ type: "error", text: message });
+      alert(message);
     } finally {
       setActionLoading(null);
     }
@@ -267,6 +279,7 @@ export default function CommandCenterPage() {
   const handleEditSend = async () => {
     if (!selectedTicket) return;
     setActionLoading("edit");
+    setActionMessage(null);
     try {
       await editTicketWithRLHF(selectedTicket.id, {
         ticket_id: selectedTicket.id,
@@ -274,8 +287,60 @@ export default function CommandCenterPage() {
         original_draft: selectedTicket.ai_draft || "",
         edited_draft: detailDraft,
       });
+      alert("Edited reply email sent to the customer and ticket marked resolved.");
       applyMessage({ type: "ticket_updated", ticket: { ...selectedTicket, status: "resolved" as TicketStatus, ai_draft: detailDraft } });
       setSelectedTicket(null);
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "Failed to send edited response";
+      setActionMessage({ type: "error", text: message });
+      alert(message);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleRegenerateDraft = async () => {
+    if (!selectedTicket) return;
+    setActionLoading("regenerate");
+    setActionMessage(null);
+    try {
+      const draft = await generateAIDraft({
+        channel: selectedTicket.channel,
+        customer_name: selectedTicket.customer_name,
+        message: selectedTicket.message,
+        product: selectedTicket.product,
+      });
+      setDetailDraft(draft.draft);
+      setDetailEditing(true);
+      setActionMessage({ type: "success", text: "Draft regenerated. Review it before sending." });
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "Failed to regenerate draft";
+      setActionMessage({ type: "error", text: message });
+      alert(message);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handlePrivateHandoff = async (channel: "email" | "whatsapp", introMessage: string) => {
+    if (!selectedTicket) return;
+    const loadingKey = channel === "whatsapp" ? "whatsapp" : "chatbot";
+    setActionLoading(loadingKey);
+    setActionMessage(null);
+    try {
+      const result = await handoffToPrivateChannel(selectedTicket.id, {
+        channel,
+        customer_name: selectedTicket.customer_name,
+        intro_message: introMessage,
+      });
+      setDetailDraft(`${detailDraft}\n\n---\nContinue privately: ${result.chat_url}`);
+      alert(`${channel === "whatsapp" ? "WhatsApp" : "AI chatbot"} handoff sent to the customer.`);
+      applyMessage({ type: "ticket_updated", ticket: { ...selectedTicket, status: "awaiting_reply" as TicketStatus } });
+      setSelectedTicket(null);
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "Failed to hand off ticket";
+      setActionMessage({ type: "error", text: message });
+      alert(message);
     } finally {
       setActionLoading(null);
     }
@@ -508,6 +573,19 @@ export default function CommandCenterPage() {
                         Human-in-the-Loop (HITL) Orchestration
                       </h3>
 
+                      {actionMessage && (
+                        <div className={cn(
+                          "rounded-[var(--radius-md)] border px-3 py-2 text-xs font-medium",
+                          actionMessage.type === "success"
+                            ? "border-[var(--accent-emerald)]/30 bg-[var(--accent-emerald)]/10 text-[var(--accent-emerald)]"
+                            : actionMessage.type === "error"
+                              ? "border-[var(--accent-rose)]/30 bg-[var(--accent-rose)]/10 text-[var(--accent-rose)]"
+                              : "border-[var(--accent-primary)]/30 bg-[var(--accent-primary)]/10 text-[var(--accent-primary)]"
+                        )}>
+                          {actionMessage.text}
+                        </div>
+                      )}
+
                       {/* AI Draft Card */}
                       <div className="hitl-response-card">
                         <div className="hitl-response-header">
@@ -521,7 +599,12 @@ export default function CommandCenterPage() {
                             </span>
                             <ConfidenceRing value={selectedTicket.confidence} size={40} />
                             <div className="flex items-center gap-1">
-                              <button title="Regenerate draft" className="p-1.5 rounded-[var(--radius-sm)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)] transition-all">
+                              <button
+                                onClick={handleRegenerateDraft}
+                                disabled={actionLoading !== null}
+                                title="Regenerate draft"
+                                className="p-1.5 rounded-[var(--radius-sm)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)] transition-all disabled:opacity-40"
+                              >
                                 <RotateCcw className="w-3.5 h-3.5" />
                               </button>
                               <button
@@ -559,7 +642,7 @@ export default function CommandCenterPage() {
                       <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
                         <button
                           onClick={handleApprove}
-                          disabled={actionLoading !== null}
+                          disabled={actionLoading !== null || !detailDraft.trim()}
                           className="hitl-btn-approve flex items-center gap-2 flex-1 justify-center"
                         >
                           <Send className="w-4 h-4" />
@@ -568,7 +651,7 @@ export default function CommandCenterPage() {
                         {detailEditing ? (
                           <button
                             onClick={handleEditSend}
-                            disabled={actionLoading !== null}
+                            disabled={actionLoading !== null || !detailDraft.trim()}
                             className="hitl-btn-edit flex items-center gap-2 flex-1 justify-center"
                           >
                             <Edit3 className="w-4 h-4" />
@@ -589,29 +672,29 @@ export default function CommandCenterPage() {
                       <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
                         <button
                           onClick={async () => {
-                            const waLink = (await createHandoffLink(selectedTicket.id, "whatsapp")).deep_link;
-                            setDetailDraft(
-                              detailDraft + `\n\n---\n📱 Continue on WhatsApp for guided support: ${waLink}`
+                            await handlePrivateHandoff(
+                              "whatsapp",
+                              `Hi ${selectedTicket.customer_name}, we've received your complaint. We'll continue this privately on WhatsApp with a secure support link.`
                             );
-                            setDetailEditing(true);
                           }}
+                          disabled={actionLoading !== null}
                           className="hitl-btn-handoff-wa flex items-center gap-2 flex-1 justify-center"
                         >
                           <MessageCircle className="w-4 h-4" />
-                          Handoff to WhatsApp
+                          {actionLoading === "whatsapp" ? "Sending…" : "Handoff to WhatsApp"}
                         </button>
                         <button
                           onClick={async () => {
-                            const chatToken = (await createHandoffLink(selectedTicket.id, "chatbot")).deep_link.replace(/^.*\/chat\//, "");
-                            setDetailDraft(
-                              detailDraft + `\n\n---\n🤖 Continue with our AI assistant for step-by-step help: ${window.location.origin}/chat/${chatToken}`
+                            await handlePrivateHandoff(
+                              "email",
+                              `Hi ${selectedTicket.customer_name}, we've received your complaint. Use the secure link below to continue with our AI assistant and support team.`
                             );
-                            setDetailEditing(true);
                           }}
+                          disabled={actionLoading !== null}
                           className="hitl-btn-handoff-bot flex items-center gap-2 flex-1 justify-center"
                         >
                           <Bot className="w-4 h-4" />
-                          Handoff to AI Chatbot
+                          {actionLoading === "chatbot" ? "Sending…" : "Handoff to AI Chatbot"}
                         </button>
                       </div>
                     </div>

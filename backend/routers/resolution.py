@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import secrets
 from datetime import datetime, timedelta, timezone
+from email.utils import parseaddr
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -13,11 +14,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import settings
 from database import get_session
-from models import Ticket, TicketMessage, TicketTimelineEvent, User
+from models import CustomerProfile, TenantConfig, Ticket, TicketMessage, TicketTimelineEvent, User
 from security import require_roles
 from services.notification import (
     build_handoff_email_html,
     build_resolution_email_html,
+    delivery_config_from_tenant,
     send_private_channel_message,
 )
 
@@ -30,7 +32,7 @@ FRONTEND_URL = getattr(settings, "FRONTEND_URL", "http://localhost:3000")
 
 class HandoffPrivateRequest(BaseModel):
     channel: str = Field(..., pattern="^(email|whatsapp)$")
-    address: str = Field(..., min_length=3, max_length=512)
+    address: str | None = Field(default=None, min_length=3, max_length=512)
     customer_name: str = Field(default="Customer", max_length=255)
     intro_message: str = Field(
         default="We've received your complaint and are looking into it privately. Please use the link below to continue the conversation securely.",
@@ -75,6 +77,48 @@ async def _get_ticket(session: AsyncSession, ticket_id: str, tenant_id: str) -> 
     return ticket
 
 
+async def _delivery_config(session: AsyncSession, tenant_id: str) -> dict:
+    config = await session.scalar(select(TenantConfig).where(TenantConfig.tenant_id == tenant_id))
+    return delivery_config_from_tenant(config)
+
+
+def _valid_email(value: str | None) -> str | None:
+    if not value:
+        return None
+    _, parsed = parseaddr(value.strip())
+    candidate = (parsed or value.strip()).lower()
+    return candidate if "@" in candidate and "." in candidate.rsplit("@", 1)[-1] else None
+
+
+async def _infer_private_address(session: AsyncSession, ticket: Ticket, channel: str) -> str | None:
+    if channel == "email":
+        if ticket.private_channel == "email":
+            existing = _valid_email(ticket.private_channel_address)
+            if existing:
+                return existing
+        if ticket.profile_id:
+            profile = await session.get(CustomerProfile, ticket.profile_id)
+            if profile:
+                profile_email = _valid_email(profile.email)
+                if profile_email:
+                    return profile_email
+                for secondary in profile.secondary_emails or []:
+                    secondary_email = _valid_email(str(secondary))
+                    if secondary_email:
+                        return secondary_email
+        return _valid_email(ticket.customer_handle)
+
+    if ticket.private_channel == "whatsapp" and ticket.private_channel_address:
+        return ticket.private_channel_address
+    if ticket.profile_id:
+        profile = await session.get(CustomerProfile, ticket.profile_id)
+        if profile and (profile.whatsapp_id or profile.phone):
+            return profile.whatsapp_id or profile.phone
+    if ticket.channel == "whatsapp":
+        return ticket.customer_handle
+    return None
+
+
 def _record_timeline(session: AsyncSession, ticket: Ticket, user: User | None, event_type: str, previous_status: str | None, note: str | None = None) -> None:
     session.add(
         TicketTimelineEvent(
@@ -112,6 +156,9 @@ async def handoff_to_private_channel(
 ) -> dict:
     """Move a ticket to a private channel (email or WhatsApp) and notify the customer."""
     ticket = await _get_ticket(session, ticket_id, user.tenant_id)
+    address = (body.address or "").strip() or await _infer_private_address(session, ticket, body.channel)
+    if not address:
+        raise HTTPException(status_code=400, detail=f"No customer {body.channel} address found for this ticket")
 
     # Generate secure token (7-day expiry handled by resolve flow, not time-based here)
     token = _make_token()
@@ -119,7 +166,7 @@ async def handoff_to_private_channel(
 
     ticket.private_channel = body.channel
     ticket.private_channel_token = token
-    ticket.private_channel_address = body.address
+    ticket.private_channel_address = address
     ticket.handoff_at = _utcnow()
     previous_status = ticket.status
     ticket.status = "awaiting_reply"
@@ -130,7 +177,7 @@ async def handoff_to_private_channel(
         tenant_id=user.tenant_id,
         sender_role="system",
         sender_name="AURA-CX",
-        content=f"Ticket moved to private {body.channel} channel. Customer notified at {body.address}.",
+        content=f"Ticket moved to private {body.channel} channel. Customer notified at {address}.",
         is_internal=True,
     )
     session.add(system_msg)
@@ -145,13 +192,16 @@ async def handoff_to_private_channel(
         intro_message=body.intro_message,
     )
 
-    await send_private_channel_message(
+    notification_sent = await send_private_channel_message(
         channel=body.channel,
-        address=body.address,
+        address=address,
         subject="🔒 Your Support Request — Secure Thread",
         text_body=text_body,
         html_body=html_body if body.channel == "email" else None,
+        delivery_config=await _delivery_config(session, ticket.tenant_id),
     )
+    if not notification_sent:
+        raise HTTPException(status_code=502, detail=f"{body.channel.title()} delivery failed or is not configured")
 
     await session.commit()
     return {
@@ -210,12 +260,15 @@ async def agent_send_message(
     # If not internal, optionally notify customer via their private channel
     if not body.is_internal and ticket.private_channel and ticket.private_channel_address:
         chat_url = f"{FRONTEND_URL}/resolve/{ticket.private_channel_token}"
-        await send_private_channel_message(
+        notification_sent = await send_private_channel_message(
             channel=ticket.private_channel,
             address=ticket.private_channel_address,
             subject="💬 New message from support",
             text_body=f"Your support agent replied:\n\n{body.content}\n\nView thread: {chat_url}",
+            delivery_config=await _delivery_config(session, ticket.tenant_id),
         )
+        if not notification_sent:
+            raise HTTPException(status_code=502, detail=f"{ticket.private_channel.title()} delivery failed or is not configured")
 
     previous_status = ticket.status
     ticket.status = "in_progress"
@@ -255,7 +308,7 @@ async def resolve_ticket(
     # Notify customer on their private channel
     if body.notify_customer and ticket.private_channel and ticket.private_channel_address:
         csat_url = f"{FRONTEND_URL}/resolve/{ticket.private_channel_token}"
-        await send_private_channel_message(
+        notification_sent = await send_private_channel_message(
             channel=ticket.private_channel,
             address=ticket.private_channel_address,
             subject="✅ Your issue has been resolved",
@@ -270,7 +323,10 @@ async def resolve_ticket(
                 resolution_note=body.resolution_note,
                 csat_url=csat_url,
             ) if ticket.private_channel == "email" else None,
+            delivery_config=await _delivery_config(session, ticket.tenant_id),
         )
+        if not notification_sent:
+            raise HTTPException(status_code=502, detail=f"{ticket.private_channel.title()} delivery failed or is not configured")
 
     await session.commit()
     return {

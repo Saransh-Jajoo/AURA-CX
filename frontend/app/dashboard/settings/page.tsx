@@ -20,17 +20,17 @@ import { useAuth } from "@/lib/auth-context";
 import type { DynamicPlatformConnection, TenantSettings, BYOIStatus } from "@/lib/types";
 
 const SERVICE_CONFIG = [
-  { key: "gemini", label: "Google Gemini AI", icon: Brain, fields: [{ name: "gemini_api_key", label: "API Key", type: "password" }] },
-  { key: "openai", label: "OpenAI", icon: Brain, fields: [{ name: "openai_api_key", label: "API Key", type: "password" }] },
-  { key: "anthropic", label: "Anthropic Claude", icon: Brain, fields: [{ name: "anthropic_api_key", label: "API Key", type: "password" }] },
-  { key: "mistral", label: "Mistral AI", icon: Brain, fields: [{ name: "mistral_api_key", label: "API Key", type: "password" }] },
-  { key: "openrouter", label: "OpenRouter", icon: Brain, fields: [{ name: "openrouter_api_key", label: "API Key", type: "password" }] },
-  { key: "ollama", label: "Ollama", icon: Server, fields: [{ name: "ollama_base_url", label: "Base URL", type: "text" }] },
-  { key: "self_hosted", label: "Self-hosted AI", icon: Server, fields: [{ name: "self_hosted_base_url", label: "Base URL", type: "text" }, { name: "self_hosted_api_key", label: "API Key", type: "password" }] },
-  { key: "pinecone", label: "Pinecone Vector DB", icon: Server, fields: [{ name: "pinecone_api_key", label: "API Key", type: "password" }, { name: "pinecone_host", label: "Host URL", type: "text" }] },
-  { key: "smtp", label: "SMTP Email", icon: Mail, fields: [{ name: "smtp_host", label: "Host", type: "text" }, { name: "smtp_port", label: "Port", type: "number" }, { name: "smtp_user", label: "Username", type: "text" }, { name: "smtp_pass", label: "Password", type: "password" }] },
-  { key: "twilio", label: "Twilio Voice", icon: Phone, fields: [{ name: "twilio_sid", label: "Account SID", type: "password" }, { name: "twilio_token", label: "Auth Token", type: "password" }, { name: "twilio_phone", label: "Phone Number", type: "text" }] },
-  { key: "storage", label: "Cloud Storage", icon: Cloud, fields: [{ name: "storage_provider", label: "Provider (s3/gcs/azure)", type: "text" }, { name: "storage_bucket", label: "Bucket Name", type: "text" }, { name: "storage_credentials", label: "Credentials JSON", type: "password" }] },
+  { key: "gemini", label: "Google Gemini AI", icon: Brain, fields: [{ name: "gemini_api_key", label: "API Key", type: "password", required: true }] },
+  { key: "openai", label: "OpenAI", icon: Brain, fields: [{ name: "openai_api_key", label: "API Key", type: "password", required: true }] },
+  { key: "anthropic", label: "Anthropic Claude", icon: Brain, fields: [{ name: "anthropic_api_key", label: "API Key", type: "password", required: true }] },
+  { key: "mistral", label: "Mistral AI", icon: Brain, fields: [{ name: "mistral_api_key", label: "API Key", type: "password", required: true }] },
+  { key: "openrouter", label: "OpenRouter", icon: Brain, fields: [{ name: "openrouter_api_key", label: "API Key", type: "password", required: true }] },
+  { key: "ollama", label: "Ollama", icon: Server, fields: [{ name: "ollama_base_url", label: "Base URL", type: "text", required: true }] },
+  { key: "self_hosted", label: "Self-hosted AI", icon: Server, fields: [{ name: "self_hosted_base_url", label: "Base URL", type: "text", required: true }, { name: "self_hosted_api_key", label: "API Key", type: "password" }] },
+  { key: "pinecone", label: "Pinecone Vector DB", icon: Server, fields: [{ name: "pinecone_api_key", label: "API Key", type: "password", required: true }, { name: "pinecone_host", label: "Host URL", type: "text", required: true }] },
+  { key: "smtp", label: "SMTP Email", icon: Mail, fields: [{ name: "smtp_host", label: "Host", type: "text", required: true }, { name: "smtp_port", label: "Port", type: "number" }, { name: "smtp_user", label: "Username", type: "text", required: true }, { name: "smtp_pass", label: "Password", type: "password", required: true }] },
+  { key: "twilio", label: "Twilio Voice", icon: Phone, fields: [{ name: "twilio_sid", label: "Account SID", type: "password", required: true }, { name: "twilio_token", label: "Auth Token", type: "password", required: true }, { name: "twilio_phone", label: "Phone Number", type: "text", required: true }] },
+  { key: "storage", label: "Cloud Storage", icon: Cloud, fields: [{ name: "storage_provider", label: "Provider (s3/gcs/azure)", type: "text", required: true }, { name: "storage_bucket", label: "Bucket Name", type: "text", required: true }, { name: "storage_credentials", label: "Credentials JSON", type: "password" }] },
 ];
 
 type PlatformField = {
@@ -39,6 +39,15 @@ type PlatformField = {
   type?: string;
   placeholder?: string;
   required?: boolean;
+};
+
+type BYOIField = PlatformField;
+
+type BYOIServiceConfig = {
+  key: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  fields: BYOIField[];
 };
 
 type PlatformTemplate = {
@@ -188,6 +197,7 @@ export default function SettingsPage() {
   const [dynamicPlatforms, setDynamicPlatforms] = useState<DynamicPlatformConnection[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [settingsMessage, setSettingsMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [activeService, setActiveService] = useState<string | null>(null);
   const [byoiFields, setByoiFields] = useState<Record<string, string>>({});
   const [editingPlatformId, setEditingPlatformId] = useState<string | null>(null);
@@ -225,7 +235,12 @@ export default function SettingsPage() {
         const platformResult = await fetchDynamicPlatformConnections();
         setDynamicPlatforms(platformResult.connections);
       }
-    } catch { /* ignore */ }
+    } catch (error) {
+      setSettingsMessage({
+        type: "error",
+        text: error instanceof Error ? error.message : "Could not load settings.",
+      });
+    }
     setLoading(false);
   }, [canManageDynamicPlatforms]);
 
@@ -233,22 +248,41 @@ export default function SettingsPage() {
 
   const handleSaveTenant = async () => {
     setSaving(true);
+    setSettingsMessage(null);
     try {
       await updateTenantSettings({ name: tenantName, domain: tenantDomain, industry: tenantIndustry, default_language: tenantLanguage });
       await loadSettings();
-    } catch { /* ignore */ }
+      setSettingsMessage({ type: "success", text: "Workspace settings saved." });
+    } catch (error) {
+      setSettingsMessage({
+        type: "error",
+        text: error instanceof Error ? error.message : "Could not save workspace settings.",
+      });
+    }
     setSaving(false);
   };
 
   const handleSaveBYOI = async () => {
     if (Object.keys(byoiFields).length === 0) return;
     setSaving(true);
+    setSettingsMessage(null);
     try {
-      await updateBYOIConfig(byoiFields);
+      const result = await updateBYOIConfig(byoiFields);
       setByoiFields({});
       setActiveService(null);
-      await loadSettings();
-    } catch { /* ignore */ }
+      setByoi(result.byoi);
+      setSettingsMessage({
+        type: "success",
+        text: result.changed_services?.length
+          ? `Saved ${result.changed_services.join(", ")} credentials.`
+          : "Credentials saved.",
+      });
+    } catch (error) {
+      setSettingsMessage({
+        type: "error",
+        text: error instanceof Error ? error.message : "Could not save BYOI credentials.",
+      });
+    }
     setSaving(false);
   };
 
@@ -301,6 +335,7 @@ export default function SettingsPage() {
       return;
     }
     setSaving(true);
+    setSettingsMessage(null);
     try {
       const payload: Record<string, unknown> = {
         platform_name: platformForm.platform_name.trim(),
@@ -320,19 +355,31 @@ export default function SettingsPage() {
       resetPlatformForm();
       const result = await fetchDynamicPlatformConnections();
       setDynamicPlatforms(result.connections);
+      setSettingsMessage({ type: "success", text: editingPlatformId ? "Platform updated." : "Platform added." });
     } catch (error) {
       setPlatformError(error instanceof Error ? error.message : "Could not save platform.");
+      setSettingsMessage({
+        type: "error",
+        text: error instanceof Error ? error.message : "Could not save platform.",
+      });
     }
     setSaving(false);
   };
 
   const handleDeleteDynamicPlatform = async (connectionId: string) => {
     setSaving(true);
+    setSettingsMessage(null);
     try {
       await deleteDynamicPlatformConnection(connectionId);
       setDynamicPlatforms(prev => prev.filter(item => item.id !== connectionId));
       if (editingPlatformId === connectionId) resetPlatformForm();
-    } catch { /* ignore */ }
+      setSettingsMessage({ type: "success", text: "Platform deleted." });
+    } catch (error) {
+      setSettingsMessage({
+        type: "error",
+        text: error instanceof Error ? error.message : "Could not delete platform.",
+      });
+    }
     setSaving(false);
   };
 
@@ -351,6 +398,16 @@ export default function SettingsPage() {
         <h1 className="text-2xl font-display font-bold tracking-tight">Settings & Infrastructure</h1>
         <p className="text-sm text-[var(--text-muted)] mt-1">Configure your workspace and bring your own API keys</p>
       </div>
+
+      {settingsMessage && (
+        <div className={`rounded-[var(--radius-md)] border px-4 py-3 text-sm font-medium ${
+          settingsMessage.type === "success"
+            ? "border-[var(--accent-emerald)]/30 bg-[var(--accent-emerald)]/10 text-[var(--accent-emerald)]"
+            : "border-[var(--accent-rose)]/30 bg-[var(--accent-rose)]/10 text-[var(--accent-rose)]"
+        }`}>
+          {settingsMessage.text}
+        </div>
+      )}
 
       {/* Workspace Settings */}
       {canManageTenantSettings && (

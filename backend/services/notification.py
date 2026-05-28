@@ -6,8 +6,10 @@ import logging
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from typing import Any
 
 from config import settings
+from services.encryption import decrypt_value
 
 logger = logging.getLogger("aura_cx.notifications")
 
@@ -19,28 +21,60 @@ async def send_private_channel_message(
     subject: str,
     text_body: str,
     html_body: str | None = None,
+    delivery_config: dict[str, Any] | None = None,
 ) -> bool:
     """Send a message via email or WhatsApp. Returns True on success."""
+    delivery_config = delivery_config or {}
     if channel == "email":
-        return await _send_email(address=address, subject=subject, text_body=text_body, html_body=html_body)
+        return await _send_email(
+            address=address,
+            subject=subject,
+            text_body=text_body,
+            html_body=html_body,
+            delivery_config=delivery_config,
+        )
     elif channel == "whatsapp":
-        return await _send_whatsapp(phone=address, body=text_body)
+        return await _send_whatsapp(phone=address, body=text_body, delivery_config=delivery_config)
     else:
         logger.warning("Unknown notification channel: %s", channel)
         return False
 
 
-async def _send_email(*, address: str, subject: str, text_body: str, html_body: str | None) -> bool:
-    smtp_host = settings.SMTP_HOST if hasattr(settings, "SMTP_HOST") else None
-    smtp_user = settings.SMTP_USER if hasattr(settings, "SMTP_USER") else None
-    smtp_pass = settings.SMTP_PASS if hasattr(settings, "SMTP_PASS") else None
-    smtp_port = int(getattr(settings, "SMTP_PORT", 587))
+def delivery_config_from_tenant(config: Any | None) -> dict[str, Any]:
+    """Build notification credentials from tenant BYOI settings, falling back to env."""
+    smtp_user = decrypt_value(config.smtp_user_enc) if config and config.smtp_user_enc else settings.SMTP_USER
+    smtp_pass = decrypt_value(config.smtp_pass_enc) if config and config.smtp_pass_enc else settings.SMTP_PASS
+    twilio_sid = decrypt_value(config.twilio_sid_enc) if config and config.twilio_sid_enc else settings.TWILIO_ACCOUNT_SID
+    twilio_token = decrypt_value(config.twilio_token_enc) if config and config.twilio_token_enc else settings.TWILIO_AUTH_TOKEN
+    return {
+        "smtp_host": (config.smtp_host if config and config.smtp_host else settings.SMTP_HOST),
+        "smtp_port": int(config.smtp_port if config and config.smtp_port else settings.SMTP_PORT),
+        "smtp_user": smtp_user,
+        "smtp_pass": smtp_pass,
+        "twilio_sid": twilio_sid,
+        "twilio_token": twilio_token,
+        "twilio_phone": (config.twilio_phone if config and config.twilio_phone else settings.TWILIO_PHONE_NUMBER),
+    }
+
+
+async def _send_email(
+    *,
+    address: str,
+    subject: str,
+    text_body: str,
+    html_body: str | None,
+    delivery_config: dict[str, Any],
+) -> bool:
+    smtp_host = delivery_config.get("smtp_host") or settings.SMTP_HOST
+    smtp_user = delivery_config.get("smtp_user") or settings.SMTP_USER
+    smtp_pass = delivery_config.get("smtp_pass") or settings.SMTP_PASS
+    smtp_port = int(delivery_config.get("smtp_port") or settings.SMTP_PORT)
 
     if not smtp_host or not smtp_user:
         logger.warning("SMTP not configured — skipping email to %s", address)
         # In dev: just log the message
         logger.info("DEV EMAIL to %s:\nSubject: %s\n%s", address, subject, text_body)
-        return True  # don't block flow in dev
+        return False
 
     try:
         msg = MIMEMultipart("alternative")
@@ -62,15 +96,15 @@ async def _send_email(*, address: str, subject: str, text_body: str, html_body: 
         return False
 
 
-async def _send_whatsapp(*, phone: str, body: str) -> bool:
-    twilio_sid = settings.TWILIO_ACCOUNT_SID or None
-    twilio_token = settings.TWILIO_AUTH_TOKEN or None
-    twilio_phone = settings.TWILIO_PHONE_NUMBER or None
+async def _send_whatsapp(*, phone: str, body: str, delivery_config: dict[str, Any]) -> bool:
+    twilio_sid = delivery_config.get("twilio_sid") or settings.TWILIO_ACCOUNT_SID or None
+    twilio_token = delivery_config.get("twilio_token") or settings.TWILIO_AUTH_TOKEN or None
+    twilio_phone = delivery_config.get("twilio_phone") or settings.TWILIO_PHONE_NUMBER or None
 
     if not twilio_sid or not twilio_token or not twilio_phone:
         logger.warning("Twilio not configured — skipping WhatsApp to %s", phone)
         logger.info("DEV WHATSAPP to %s:\n%s", phone, body)
-        return True  # don't block flow in dev
+        return False
 
     try:
         from twilio.rest import Client  # type: ignore

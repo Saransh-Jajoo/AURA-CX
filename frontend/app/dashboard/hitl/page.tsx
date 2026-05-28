@@ -54,12 +54,11 @@ function PrivateChannelHandoff({ ticketId, customerName }: { ticketId: string; c
   const [success, setSuccess] = React.useState<string | null>(null);
 
   const handleSend = async () => {
-    if (!address.trim()) return;
     setLoading(true);
     try {
       const res = await handoffToPrivateChannel(ticketId, {
         channel,
-        address: address.trim(),
+        address: address.trim() || undefined,
         customer_name: customerName,
         intro_message: introMessage,
       });
@@ -103,7 +102,7 @@ function PrivateChannelHandoff({ ticketId, customerName }: { ticketId: string; c
                   </div>
                   <h3 className="font-semibold text-lg mb-2">Customer Notified ✅</h3>
                   <p className="text-sm text-[var(--text-muted)] mb-4">
-                    {channel === "email" ? "Email sent" : "WhatsApp sent"} to {address}
+                    {channel === "email" ? "Email sent" : "WhatsApp sent"}{address ? ` to ${address}` : ""}
                   </p>
                   <p className="text-xs text-[var(--text-muted)] bg-[var(--bg-inset)] rounded-lg p-2 font-mono break-all">
                     {success}
@@ -179,7 +178,7 @@ function PrivateChannelHandoff({ ticketId, customerName }: { ticketId: string; c
                     </button>
                     <button
                       onClick={handleSend}
-                      disabled={loading || !address.trim()}
+                      disabled={loading}
                       className="flex-1 py-2 rounded-[var(--radius-md)] bg-[var(--accent-primary)] text-white text-sm font-semibold disabled:opacity-40 transition-all flex items-center justify-center gap-2"
                     >
                       {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Lock className="w-4 h-4" />}
@@ -238,7 +237,7 @@ export default function HITLPage() {
 
     try {
       if (action === "approve") {
-        await approveTicket(item.id);
+        await approveTicket(item.id, editDraft || item.ai_draft);
         await sendRLHFSignal({
           ticket_id: item.id,
           signal_type: "positive",
