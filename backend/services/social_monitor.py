@@ -9,6 +9,7 @@ from __future__ import annotations
 import email as email_lib
 import imaplib
 import logging
+from email.header import decode_header, make_header
 from email.utils import parseaddr
 from typing import Any
 
@@ -21,6 +22,52 @@ logger = logging.getLogger("aura_cx.social_monitor")
 
 class MonitorError(RuntimeError):
     pass
+
+
+def _decode_header_value(value: str | None) -> str:
+    if not value:
+        return ""
+    try:
+        return str(make_header(decode_header(value)))
+    except Exception:  # noqa: BLE001
+        return value
+
+
+def _message_text_body(msg: email_lib.message.Message) -> str:
+    plain_body = ""
+    html_body = ""
+    if msg.is_multipart():
+        for part in msg.walk():
+            disposition = (part.get("Content-Disposition") or "").lower()
+            if "attachment" in disposition:
+                continue
+            content_type = part.get_content_type()
+            if content_type not in {"text/plain", "text/html"}:
+                continue
+            payload = part.get_payload(decode=True)
+            if not payload:
+                continue
+            charset = part.get_content_charset() or "utf-8"
+            decoded = payload.decode(charset, errors="replace").strip()
+            if content_type == "text/plain" and decoded:
+                plain_body = decoded
+                break
+            if content_type == "text/html" and decoded and not html_body:
+                html_body = decoded
+    else:
+        payload = msg.get_payload(decode=True)
+        if payload:
+            charset = msg.get_content_charset() or "utf-8"
+            plain_body = payload.decode(charset, errors="replace").strip()
+
+    if plain_body:
+        return plain_body
+    if html_body:
+        import re
+        text = re.sub(r"<(br|/p|/div)\b[^>]*>", "\n", html_body, flags=re.IGNORECASE)
+        text = re.sub(r"<[^>]+>", " ", text)
+        return re.sub(r"\s+", " ", text).strip()
+    return ""
 
 
 # ── X (Twitter) API v2 ────────────────────────────────────────
@@ -108,10 +155,15 @@ def poll_email_inbox(
         {"posts": [{"id", "text", "author_handle", "author_name", "subject", "created_at"}], "newest_id": str}
     """
     credentials = credentials or {}
-    host = str(credentials.get("imap_host") or credentials.get("host") or settings.IMAP_HOST or "").strip()
+    host = str(
+        credentials.get("imap_host")
+        or credentials.get("host")
+        or settings.IMAP_HOST
+        or ("imap.gmail.com" if settings.SMTP_USER else "")
+    ).strip()
     port = int(credentials.get("imap_port") or credentials.get("port") or settings.IMAP_PORT)
-    user = str(credentials.get("imap_user") or credentials.get("user") or credentials.get("username") or settings.IMAP_USER or "").strip()
-    password = str(credentials.get("imap_password") or credentials.get("password") or settings.IMAP_PASSWORD or "").strip()
+    user = str(credentials.get("imap_user") or credentials.get("user") or credentials.get("username") or settings.IMAP_USER or settings.SMTP_USER or "").strip()
+    password = str(credentials.get("imap_password") or credentials.get("password") or settings.IMAP_PASSWORD or settings.SMTP_PASS or "").strip()
     folder = folder.strip()
     use_ssl = credentials.get("imap_use_ssl", credentials.get("use_ssl", settings.IMAP_USE_SSL))
     if isinstance(use_ssl, str):
@@ -130,7 +182,11 @@ def poll_email_inbox(
         mail.select(folder, readonly=True)
 
         if since_uid:
-            _status, data = mail.uid("search", None, f"UID {since_uid}:*")
+            try:
+                next_uid = str(int(since_uid) + 1)
+            except ValueError:
+                next_uid = since_uid
+            _status, data = mail.uid("search", None, f"UID {next_uid}:*")
         else:
             _status, data = mail.uid("search", None, "ALL")
 
@@ -139,8 +195,6 @@ def poll_email_inbox(
             return {"posts": [], "newest_id": since_uid}
 
         uid_list = data[0].split()
-        if since_uid:
-            uid_list = [uid for uid in uid_list if uid.decode() != since_uid]
         uid_list = uid_list[-max_results:]
 
         posts = []
@@ -154,30 +208,26 @@ def poll_email_inbox(
             raw = msg_data[0][1]
             msg = email_lib.message_from_bytes(raw)
 
-            body = ""
-            if msg.is_multipart():
-                for part in msg.walk():
-                    if part.get_content_type() == "text/plain":
-                        charset = part.get_content_charset() or "utf-8"
-                        body = part.get_payload(decode=True).decode(charset, errors="replace")
-                        break
-            else:
-                charset = msg.get_content_charset() or "utf-8"
-                body = msg.get_payload(decode=True).decode(charset, errors="replace")
-
             sender = msg.get("From", "")
-            subject = msg.get("Subject", "")
+            reply_to = msg.get("Reply-To", "")
+            subject = _decode_header_value(msg.get("Subject"))
             date = msg.get("Date", "")
+            message_id = (msg.get("Message-ID") or uid.decode()).strip()
             sender_name, sender_email = parseaddr(sender)
+            reply_name, reply_email = parseaddr(reply_to)
+            body = _message_text_body(msg)
 
             posts.append({
-                "id": uid.decode(),
+                "id": message_id,
                 "text": f"Subject: {subject}\n\n{body[:5000]}",
-                "author_handle": sender_email or sender,
-                "author_name": sender_name or sender_email,
+                "author_handle": reply_email or sender_email or sender,
+                "author_name": _decode_header_value(sender_name or reply_name or sender_email),
                 "subject": subject,
                 "created_at": date,
                 "url": None,
+                "sender_email": sender_email,
+                "reply_to": reply_email,
+                "imap_uid": uid.decode(),
             })
             newest_uid = uid.decode()
 

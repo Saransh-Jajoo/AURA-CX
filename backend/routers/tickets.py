@@ -66,7 +66,7 @@ class StatusTransitionRequest(BaseModel):
     @classmethod
     def validate_status(cls, value: str) -> str:
         value = value.lower().strip()
-        allowed = {"new", "in_progress", "awaiting_reply", "escalated", "resolved", "reopened", "closed"}
+        allowed = {"new", "in_progress", "awaiting_reply", "escalated", "resolved", "reopened", "closed", "ignored"}
         if value not in allowed:
             raise ValueError(f"status must be one of {sorted(allowed)}")
         return value
@@ -172,6 +172,9 @@ async def _dispatch_email_resolution(
         if ticket.channel in {"gmail", "email", "web_form"}:
             raise HTTPException(status_code=400, detail="No customer email address found for this ticket")
         return False
+
+    if not ticket.private_channel_token:
+        ticket.private_channel_token = secrets.token_urlsafe(48)
 
     config = await session.scalar(select(TenantConfig).where(TenantConfig.tenant_id == ticket.tenant_id))
     sent = await send_private_channel_message(
@@ -509,4 +512,20 @@ async def create_handoff_link(
     else:
         link = f"{settings.FRONTEND_URL.rstrip('/')}/chat/{ticket.id}?handoff={token}"
     return {"ticket_id": ticket.id, "channel": body.channel, "expires_at": expires, "deep_link": link}
+
+
+@router.post("/tickets/{ticket_id}/ignore")
+async def ignore_ticket(
+    ticket_id: str,
+    user: Annotated[User, Depends(require_roles("tenant_admin", "manager", "support_agent", "qa_reviewer"))],
+    session: Annotated[AsyncSession, Depends(get_session)],
+):
+    """Mark a ticket as ignored (not a complaint / duplicate) and record timeline."""
+    ticket = await _get_scoped_ticket(session, user, ticket_id)
+    previous = ticket.status
+    ticket.status = "ignored"
+    _record_timeline(session, ticket=ticket, actor=user, event_type="ticket.ignored", previous_status=previous, new_status=ticket.status, note="Ignored by reviewer")
+    await session.commit()
+    await manager.broadcast(ticket.tenant_id, {"type": "ticket_updated", "ticket": ticket_to_dict(ticket)})
+    return {"status": "ignored", "ticket": ticket_to_dict(ticket)}
 

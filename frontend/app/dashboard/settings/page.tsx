@@ -12,6 +12,7 @@ import {
   deleteDynamicPlatformConnection,
   fetchDynamicPlatformConnections,
   fetchTenantSettings,
+  pollDynamicPlatformConnection,
   updateBYOIConfig,
   updateDynamicPlatformConnection,
   updateTenantSettings,
@@ -204,6 +205,7 @@ export default function SettingsPage() {
   const [platformType, setPlatformType] = useState(DEFAULT_PLATFORM_TEMPLATE.key);
   const [platformFields, setPlatformFields] = useState<Record<string, string>>({});
   const [platformError, setPlatformError] = useState("");
+  const [pollingPlatformId, setPollingPlatformId] = useState<string | null>(null);
   const [platformForm, setPlatformForm] = useState({
     platform_name: DEFAULT_PLATFORM_TEMPLATE.platformName,
     account_identifier: "",
@@ -381,6 +383,25 @@ export default function SettingsPage() {
       });
     }
     setSaving(false);
+  };
+
+  const handlePollDynamicPlatform = async (connectionId: string) => {
+    setPollingPlatformId(connectionId);
+    setSettingsMessage(null);
+    try {
+      const result = await pollDynamicPlatformConnection(connectionId);
+      setDynamicPlatforms(prev => prev.map(item => item.id === connectionId ? result.connection : item));
+      setSettingsMessage({
+        type: "success",
+        text: `Poll complete: ${result.result.tickets_created} ticket(s), ${result.result.new_mentions} new message(s).`,
+      });
+    } catch (error) {
+      setSettingsMessage({
+        type: "error",
+        text: error instanceof Error ? error.message : "Could not poll platform.",
+      });
+    }
+    setPollingPlatformId(null);
   };
 
   if (loading) {
@@ -653,6 +674,15 @@ export default function SettingsPage() {
                       {connection.last_error && <p className="text-[10px] text-[var(--accent-danger)] mt-1">{connection.last_error}</p>}
                     </div>
                     <div className="flex gap-1">
+                      <button
+                        onClick={() => handlePollDynamicPlatform(connection.id)}
+                        disabled={pollingPlatformId === connection.id}
+                        className="p-2 rounded-[var(--radius-md)] hover:bg-[var(--bg-base)] disabled:opacity-50"
+                        aria-label="Poll platform now"
+                        title="Poll now"
+                      >
+                        <RefreshCw className={`w-3.5 h-3.5 ${pollingPlatformId === connection.id ? "animate-spin" : ""}`} />
+                      </button>
                       <button onClick={() => handleEditPlatform(connection)} className="p-2 rounded-[var(--radius-md)] hover:bg-[var(--bg-base)]" aria-label="Edit platform">
                         <Edit3 className="w-3.5 h-3.5" />
                       </button>

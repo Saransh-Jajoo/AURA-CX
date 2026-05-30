@@ -218,6 +218,20 @@ class PlatformAPIConnection(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False)
 
 
+# ── Email Verification Token ─────────────────────────────────
+class EmailVerificationToken(Base):
+    """Secure email verification tokens for customer profiles."""
+    __tablename__ = "email_verification_tokens"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True, default=lambda: new_id("evt"))
+    profile_id: Mapped[str] = mapped_column(ForeignKey("customer_profiles.id", ondelete="CASCADE"), index=True, nullable=False)
+    email: Mapped[str] = mapped_column(String(320), index=True, nullable=False)
+    token: Mapped[str] = mapped_column(String(128), unique=True, nullable=False, default=lambda: secrets.token_urlsafe(48))
+    verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+
+
 # ── Customer Profile ─────────────────────────────────────────
 class CustomerProfile(Base):
     __tablename__ = "customer_profiles"
@@ -226,6 +240,8 @@ class CustomerProfile(Base):
     tenant_id: Mapped[str] = mapped_column(ForeignKey("tenants.id", ondelete="CASCADE"), index=True, nullable=False)
     name: Mapped[str] = mapped_column(String(255), default="Unknown Customer", nullable=False)
     email: Mapped[str | None] = mapped_column(String(320), index=True)
+    email_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     x_handle: Mapped[str | None] = mapped_column(String(255), index=True)
     reddit_handle: Mapped[str | None] = mapped_column(String(255), index=True)
     whatsapp_id: Mapped[str | None] = mapped_column(String(255), index=True)
@@ -243,6 +259,9 @@ class CustomerProfile(Base):
     identity_vectors: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
     # Language preference
     preferred_language: Mapped[str] = mapped_column(String(8), default="en", nullable=False)
+    # Profile context for personalized drafts
+    customer_segment: Mapped[str | None] = mapped_column(String(64))  # VIP, enterprise, standard, etc.
+    ticket_interaction_history: Mapped[list[dict]] = mapped_column(JSON, default=list, nullable=False)  # Previous resolution context
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False)
 
@@ -271,6 +290,10 @@ class Ticket(Base):
     rag_sources: Mapped[list[dict]] = mapped_column(JSON, default=list, nullable=False)
     embedding: Mapped[list[float]] = mapped_column(JSON, default=list, nullable=False)
     event_metadata: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+    # Email verification (for email channel tickets)
+    requires_email_verification: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    email_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    email_verification_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     # SLA tracking
     sla_priority: Mapped[str] = mapped_column(String(8), default="p3", nullable=False)
     sla_deadline: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

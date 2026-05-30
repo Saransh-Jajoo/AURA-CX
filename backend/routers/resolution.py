@@ -22,6 +22,7 @@ from services.notification import (
     delivery_config_from_tenant,
     send_private_channel_message,
 )
+from services.realtime import manager, ticket_to_dict
 
 router = APIRouter()
 
@@ -195,7 +196,7 @@ async def handoff_to_private_channel(
     notification_sent = await send_private_channel_message(
         channel=body.channel,
         address=address,
-        subject="🔒 Your Support Request — Secure Thread",
+        subject="Your Support Request - Secure Thread",
         text_body=text_body,
         html_body=html_body if body.channel == "email" else None,
         delivery_config=await _delivery_config(session, ticket.tenant_id),
@@ -204,6 +205,7 @@ async def handoff_to_private_channel(
         raise HTTPException(status_code=502, detail=f"{body.channel.title()} delivery failed or is not configured")
 
     await session.commit()
+    await manager.broadcast(ticket.tenant_id, {"type": "ticket_updated", "ticket": ticket_to_dict(ticket)})
     return {
         "status": "ok",
         "channel": body.channel,
@@ -263,7 +265,7 @@ async def agent_send_message(
         notification_sent = await send_private_channel_message(
             channel=ticket.private_channel,
             address=ticket.private_channel_address,
-            subject="💬 New message from support",
+            subject="New message from support",
             text_body=f"Your support agent replied:\n\n{body.content}\n\nView thread: {chat_url}",
             delivery_config=await _delivery_config(session, ticket.tenant_id),
         )
@@ -274,6 +276,7 @@ async def agent_send_message(
     ticket.status = "in_progress"
     _record_timeline(session, ticket, user, "ticket.agent_message", previous_status, "internal" if body.is_internal else "customer_reply")
     await session.commit()
+    await manager.broadcast(ticket.tenant_id, {"type": "ticket_updated", "ticket": ticket_to_dict(ticket)})
     return {"status": "ok", "message": _serialize_message(msg)}
 
 
@@ -311,7 +314,7 @@ async def resolve_ticket(
         notification_sent = await send_private_channel_message(
             channel=ticket.private_channel,
             address=ticket.private_channel_address,
-            subject="✅ Your issue has been resolved",
+            subject="Your issue has been resolved",
             text_body=(
                 f"Your complaint has been resolved.\n\n"
                 f"Resolution: {body.resolution_note}\n\n"
@@ -329,6 +332,7 @@ async def resolve_ticket(
             raise HTTPException(status_code=502, detail=f"{ticket.private_channel.title()} delivery failed or is not configured")
 
     await session.commit()
+    await manager.broadcast(ticket.tenant_id, {"type": "ticket_updated", "ticket": ticket_to_dict(ticket)})
     return {
         "status": "resolved",
         "resolved_at": ticket.resolved_at.isoformat(),
@@ -399,8 +403,9 @@ async def customer_send_message(
         is_internal=False,
     )
     session.add(msg)
-    ticket.status = "awaiting_reply"
+    ticket.status = "in_progress"
     await session.commit()
+    await manager.broadcast(ticket.tenant_id, {"type": "ticket_updated", "ticket": ticket_to_dict(ticket)})
     return {"status": "ok", "message": _serialize_message(msg)}
 
 

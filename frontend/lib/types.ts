@@ -4,7 +4,7 @@
    ═══════════════════════════════════════════════════════════ */
 
 // ── Ticket / Live Feed ───────────────────────────────────────
-export type TicketStatus = "new" | "in_progress" | "awaiting_reply" | "resolved" | "escalated";
+export type TicketStatus = "new" | "in_progress" | "awaiting_reply" | "resolved" | "escalated" | "ignored";
 export type KnownChannel = "x" | "reddit" | "gmail" | "whatsapp" | "web_form" | "voice";
 
 export interface Ticket {

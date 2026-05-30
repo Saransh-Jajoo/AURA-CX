@@ -6,15 +6,14 @@ import { cn } from "@/lib/utils";
 import {
   fetchHITLQueue, approveTicket, escalateTicket,
   editTicketWithRLHF, sendRLHFSignal, fetchProfile,
-  generateAIDraft, handoffToPrivateChannel,
+  generateAIDraft, handoffToPrivateChannel, ignoreTicket,
 } from "@/lib/api";
 import type { HITLItem, GoldenProfile } from "@/lib/types";
 import { GoldenProfileStitching } from "@/components/golden-profile-stitching";
 import { SentimentGauge } from "@/components/sentiment-gauge";
 import {
   CheckCircle, XCircle, Edit3, Send, AlertTriangle, BookOpen,
-  Zap, ChevronRight, Sparkles, RotateCcw, MoreHorizontal, Copy, Trash2,
-  MessageCircle, Loader2, Lock, Mail, X,
+  Zap, ChevronRight, Sparkles, RotateCcw, Copy, Loader2, Lock, X,
 } from "lucide-react";
 import { ChannelBadge } from "@/components/channel-icons";
 
@@ -45,7 +44,6 @@ function ConfidenceRing({ value, size = 40 }: { value: number; size?: number }) 
 /* ── Private Channel Handoff Modal ────────────────────────── */
 function PrivateChannelHandoff({ ticketId, customerName }: { ticketId: string; customerName: string }) {
   const [open, setOpen] = React.useState(false);
-  const [channel, setChannel] = React.useState<"email" | "whatsapp">("email");
   const [address, setAddress] = React.useState("");
   const [introMessage, setIntroMessage] = React.useState(
     `Hi ${customerName}, we've received your complaint and are looking into it. For your privacy, we'll continue this conversation securely via this private link.`
@@ -57,7 +55,7 @@ function PrivateChannelHandoff({ ticketId, customerName }: { ticketId: string; c
     setLoading(true);
     try {
       const res = await handoffToPrivateChannel(ticketId, {
-        channel,
+        channel: "email",
         address: address.trim() || undefined,
         customer_name: customerName,
         intro_message: introMessage,
@@ -102,7 +100,7 @@ function PrivateChannelHandoff({ ticketId, customerName }: { ticketId: string; c
                   </div>
                   <h3 className="font-semibold text-lg mb-2">Customer Notified ✅</h3>
                   <p className="text-sm text-[var(--text-muted)] mb-4">
-                    {channel === "email" ? "Email sent" : "WhatsApp sent"}{address ? ` to ${address}` : ""}
+                    Email sent{address ? ` to ${address}` : ""}
                   </p>
                   <p className="text-xs text-[var(--text-muted)] bg-[var(--bg-inset)] rounded-lg p-2 font-mono break-all">
                     {success}
@@ -129,34 +127,15 @@ function PrivateChannelHandoff({ ticketId, customerName }: { ticketId: string; c
                     Resolution will continue privately — not on public social media. The customer will receive a secure link.
                   </p>
 
-                  {/* Channel selector */}
-                  <div className="grid grid-cols-2 gap-2 mb-4">
-                    {(["email", "whatsapp"] as const).map((ch) => (
-                      <button
-                        key={ch}
-                        onClick={() => setChannel(ch)}
-                        className={cn(
-                          "flex items-center gap-2 px-4 py-2.5 rounded-[var(--radius-md)] border text-sm font-medium transition-all",
-                          channel === ch
-                            ? "border-[var(--accent-primary)] bg-[var(--accent-primary)]/10 text-[var(--accent-primary)]"
-                            : "border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-                        )}
-                      >
-                        {ch === "email" ? <Mail className="w-4 h-4" /> : <MessageCircle className="w-4 h-4" />}
-                        {ch === "email" ? "Email" : "WhatsApp"}
-                      </button>
-                    ))}
-                  </div>
-
                   {/* Address input */}
                   <label className="text-xs font-semibold text-[var(--text-muted)] mb-1 block">
-                    {channel === "email" ? "Customer email address" : "Customer phone (+1234567890)"}
+                    Customer email address
                   </label>
                   <input
-                    type={channel === "email" ? "email" : "tel"}
+                    type="email"
                     value={address}
                     onChange={(e) => setAddress(e.target.value)}
-                    placeholder={channel === "email" ? "customer@example.com" : "+1 555 123 4567"}
+                    placeholder="customer@example.com"
                     className="w-full bg-[var(--bg-inset)] border border-[var(--border-subtle)] rounded-[var(--radius-md)] px-3 py-2 text-sm mb-3 focus:outline-none focus:border-[var(--accent-primary)] transition-colors"
                   />
 
@@ -231,7 +210,7 @@ export default function HITLPage() {
     }
   }, [item]);
 
-  const handleAction = async (action: "approve" | "edit" | "escalate") => {
+  const handleAction = async (action: "approve" | "edit" | "escalate" | "ignore") => {
     if (!item) return;
     setActionLoading(action);
 
@@ -250,13 +229,15 @@ export default function HITLPage() {
           original_draft: item.ai_draft || editDraft,
           edited_draft: editDraft,
         });
-      } else {
+      } else if (action === "escalate") {
         await escalateTicket(item.id);
         await sendRLHFSignal({
           ticket_id: item.id,
           signal_type: "escalated",
           original_draft: editDraft || item.ai_draft,
         });
+      } else if (action === "ignore") {
+        await ignoreTicket(item.id);
       }
 
       setQueue((prev) => prev.filter((_, i) => i !== selected));
@@ -264,6 +245,25 @@ export default function HITLPage() {
       setEditing(false);
       const remaining = queue.filter((_, i) => i !== selected);
       if (remaining.length) setEditDraft(remaining[0].ai_draft);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleRegenerateDraft = async () => {
+    if (!item) return;
+    setActionLoading("regenerate");
+    try {
+      const draft = await generateAIDraft({
+        channel: item.channel,
+        customer_name: item.customer_name,
+        message: item.message,
+        product: item.product,
+      });
+      setEditDraft(draft.draft);
+      setEditing(true);
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : "Failed to generate draft");
     } finally {
       setActionLoading(null);
     }
@@ -405,17 +405,22 @@ export default function HITLPage() {
                         </span>
                         <ConfidenceRing value={item.confidence} />
                         <div className="flex items-center gap-1">
-                          <button title="Regenerate draft" className="p-1.5 rounded-[var(--radius-sm)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)] transition-all">
+                          <button
+                            onClick={handleRegenerateDraft}
+                            disabled={actionLoading !== null}
+                            title="Regenerate draft"
+                            className="p-1.5 rounded-[var(--radius-sm)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)] transition-all"
+                          >
                             <RotateCcw className="w-3.5 h-3.5" />
                           </button>
-                          <button title="Copy draft" className="p-1.5 rounded-[var(--radius-sm)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)] transition-all">
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(editDraft || item.ai_draft || "");
+                            }}
+                            title="Copy draft"
+                            className="p-1.5 rounded-[var(--radius-sm)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)] transition-all"
+                          >
                             <Copy className="w-3.5 h-3.5" />
-                          </button>
-                          <button title="Delete draft" className="p-1.5 rounded-[var(--radius-sm)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)] transition-all">
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                          <button title="More actions" className="p-1.5 rounded-[var(--radius-sm)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)] transition-all">
-                            <MoreHorizontal className="w-3.5 h-3.5" />
                           </button>
                         </div>
                       </div>
@@ -485,6 +490,15 @@ export default function HITLPage() {
                         MANUAL EDIT
                       </button>
                     )}
+
+                    <button
+                      onClick={() => handleAction("ignore")}
+                      disabled={actionLoading !== null}
+                      className="hitl-btn-ignore flex items-center justify-center gap-2 flex-1"
+                    >
+                      <XCircle className="w-4 h-4" />
+                      {actionLoading === "ignore" ? "Ignoring…" : "Ignore Ticket"}
+                    </button>
 
                     <button
                       onClick={() => handleAction("escalate")}

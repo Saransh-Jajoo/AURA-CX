@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+import logging
+from datetime import datetime, timezone, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Body, Depends, Header, HTTPException, Request
@@ -13,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import settings
 from database import get_session
-from models import CustomerProfile, IntegrationSource, TenantConfig, Ticket, User
+from models import CustomerProfile, EmailVerificationToken, IntegrationSource, TenantConfig, Ticket, User
 from routers.integrations import verify_webhook_source
 from security import assert_tenant, require_roles, verify_webhook_signature
 from services import ai_service
@@ -22,6 +23,8 @@ from services.deduplication import get_dedup_service
 from services.realtime import manager, ticket_to_dict
 from services.scrubbing import scrub_text
 from services.sla_engine import assign_sla
+
+logger = logging.getLogger("aura_cx.ingestion")
 
 router = APIRouter()
 
@@ -46,6 +49,14 @@ class WebhookPayload(BaseModel):
 
 
 def _source_matches(source: IntegrationSource, payload: WebhookPayload) -> bool:
+    # Direct email matching to bypass search vulnerabilities
+    p_chan = (payload.channel or "").lower().strip()
+    s_plat = (source.platform or "").lower().strip()
+    if p_chan in {"gmail", "email", "imap"} and s_plat in {"gmail", "email", "imap"}:
+        target = str(payload.metadata.get("target_account") or "").lower().strip()
+        if source.identifier.lower().strip() == target:
+            return True
+
     haystack = " ".join(
         [
             payload.sender_id or "",
@@ -70,6 +81,42 @@ def _source_matches(source: IntegrationSource, payload: WebhookPayload) -> bool:
     return False
 
 
+def _fallback_ticket_classification(text: str) -> dict:
+    lowered = text.lower()
+    severity = "medium"
+    sentiment = "neutral"
+    sentiment_score = 0.0
+    intent = "Email Inquiry"
+    if any(term in lowered for term in ("fraud", "unauthorized", "deducted", "debited", "charged", "hack", "breach")):
+        intent = "Billing Dispute"
+        severity = "critical"
+        sentiment = "furious"
+        sentiment_score = -0.8
+    elif any(term in lowered for term in ("refund", "payment", "transaction", "upi", "loan", "emi", "card")):
+        intent = "Billing Dispute"
+        severity = "high"
+        sentiment = "frustrated"
+        sentiment_score = -0.55
+    elif any(term in lowered for term in ("login", "password", "locked", "account")):
+        intent = "Account Issue"
+        severity = "high"
+        sentiment = "frustrated"
+        sentiment_score = -0.45
+    elif any(term in lowered for term in ("error", "failed", "bug", "not working", "crash")):
+        intent = "Service Failure"
+        severity = "medium"
+        sentiment = "frustrated"
+        sentiment_score = -0.35
+    return {
+        "intent": intent,
+        "severity": severity,
+        "sentiment": sentiment,
+        "sentiment_score": sentiment_score,
+        "confidence": 0.62,
+        "product": "Banking Support",
+    }
+
+
 async def _get_or_create_profile(
     session: AsyncSession,
     *,
@@ -80,7 +127,18 @@ async def _get_or_create_profile(
     embedding: list[float],
 ) -> tuple[CustomerProfile, dict]:
     identity = {"matched": False, "cosine_similarity": 0.0, "method": "Vector Similarity (Cosine > 0.92)"}
-    email = handle.lower() if channel in {"gmail", "web_form"} and "@" in handle else None
+    
+    import re
+    from email.utils import parseaddr
+    email_regex = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+    email = None
+    clean_handle = handle.strip()
+    
+    if (channel.lower() in {"gmail", "email", "imap", "web_form"}) and "@" in clean_handle:
+        _, parsed_email = parseaddr(clean_handle)
+        candidate = (parsed_email or clean_handle).strip().lower()
+        if email_regex.match(candidate):
+            email = candidate
 
     if email:
         profile = await session.scalar(select(CustomerProfile).where(CustomerProfile.tenant_id == tenant_id, CustomerProfile.email == email))
@@ -150,9 +208,20 @@ async def process_webhook_payload(
     scrubbed = scrub_text(payload.raw_content)
     try:
         classification = await ai_service.classify_ticket(scrubbed["cleaned_text"], channel)
+    except Exception as exc:  # noqa: BLE001
+        classification = _fallback_ticket_classification(scrubbed["cleaned_text"])
+        payload.metadata = {
+            **(payload.metadata or {}),
+            "classification_fallback": str(exc)[:500],
+        }
+    try:
         embedding = await ai_service.embed_text(scrubbed["cleaned_text"])
-    except ai_service.AIConfigurationError as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except Exception as exc:  # noqa: BLE001
+        embedding = [0.0] * 768
+        payload.metadata = {
+            **(payload.metadata or {}),
+            "embedding_fallback": str(exc)[:500],
+        }
 
     product = str(classification.get("product") or payload.product or "unspecified")[:255]
     profile, identity = await _get_or_create_profile(
@@ -167,6 +236,13 @@ async def process_webhook_payload(
     sentiment_score = float(classification.get("sentiment_score") or 0.0)
     profile.churn_risk = max(0.0, min(1.0, (-sentiment_score + 1) / 2))
     profile.tags = sorted(set((profile.tags or []) + [product, str(classification.get("intent") or "unclassified")]))[:12]
+
+    # Determine if email verification is required for this email channel
+    requires_verification = (
+        channel.lower() in {"gmail", "email", "imap", "web_form"}
+        and profile.email
+        and not profile.email_verified
+    )
 
     ticket = Ticket(
         tenant_id=tenant_id,
@@ -184,6 +260,8 @@ async def process_webhook_payload(
         pii_report=scrubbed["pii_report"],
         toxicity_score=scrubbed["toxicity_score"],
         embedding=embedding,
+        requires_email_verification=requires_verification,
+        email_verified=profile.email_verified,
         event_metadata={
             "external_id": payload.external_id,
             "received_at": datetime.now(timezone.utc).isoformat(),
@@ -197,9 +275,21 @@ async def process_webhook_payload(
     await assign_sla(session, ticket)
     try:
         config = await session.scalar(select(TenantConfig).where(TenantConfig.tenant_id == tenant_id))
+        
+        # Build customer context for personalized draft
+        customer_context = {
+            "customer_segment": profile.customer_segment,
+            "ltv": profile.ltv,
+            "churn_risk": profile.churn_risk,
+            "plan": profile.plan,
+            "tags": profile.tags or [],
+            "ticket_interaction_history": profile.ticket_interaction_history or [],
+        }
+        
         draft = await ai_service.generate_draft(
             tenant_id=tenant_id,
             ticket=ticket_to_dict(ticket),
+            customer_context=customer_context,
             provider_configs=tenant_provider_configs(config),
             preferred_provider=config.ai_provider if config else None,
             fallback_order=config.ai_fallback_order if config else None,
@@ -215,6 +305,58 @@ async def process_webhook_payload(
         }
     await session.commit()
     await session.refresh(ticket)
+    
+    # Send verification email if this is a new email user
+    if ticket.requires_email_verification and profile.email:
+        try:
+            # Create or get verification token
+            existing_token = await session.scalar(
+                select(EmailVerificationToken).where(
+                    EmailVerificationToken.profile_id == profile.id,
+                    EmailVerificationToken.email == profile.email,
+                    EmailVerificationToken.verified_at.is_(None),
+                )
+            )
+            
+            if existing_token:
+                token = existing_token.token
+            else:
+                now = datetime.now(timezone.utc)
+                new_token = EmailVerificationToken(
+                    profile_id=profile.id,
+                    email=profile.email,
+                    expires_at=now + timedelta(hours=24),
+                )
+                session.add(new_token)
+                await session.flush()
+                token = new_token.token
+            
+            # Build verification URL
+            verification_url = f"{settings.APP_URL}/verify-email?token={token}"
+            
+            # Send email (if notification service is configured)
+            try:
+                from services.notification import send_email
+                await send_email(
+                    to=profile.email,
+                    subject="Verify your email to activate your support ticket",
+                    html_body=f"""
+                    <h2>Email Verification Required</h2>
+                    <p>Hi {profile.name},</p>
+                    <p>Thank you for contacting AURA-CX support. We received your message about: <strong>{ticket.intent}</strong></p>
+                    <p>To process your ticket and receive updates, please verify your email address:</p>
+                    <p><a href="{verification_url}" style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Verify Email Address</a></p>
+                    <p>Ticket ID: {ticket.id}</p>
+                    <p>This link will expire in 24 hours.</p>
+                    """,
+                )
+                ticket.email_verification_sent_at = datetime.now(timezone.utc)
+                await session.commit()
+            except Exception as exc:
+                logger.warning(f"Failed to send verification email for ticket {ticket.id}: {exc}")
+        except Exception as exc:
+            logger.error(f"Error creating verification token for ticket {ticket.id}: {exc}")
+    
     await manager.broadcast(tenant_id, {"type": "new_ticket", "ticket": ticket_to_dict(ticket)})
     return ticket
 
@@ -344,3 +486,183 @@ async def ingest_with_jwt(
         sources=list(sources),
     )
     return {"status": "ingested", "ticket": ticket_to_dict(ticket)}
+
+
+# ── Email Verification Endpoints ──────────────────────────────
+@router.post("/verify-email/send")
+async def send_verification_email(
+    profile_id: str,
+    user: Annotated[User, Depends(require_roles("tenant_admin", "support_agent"))],
+    session: Annotated[AsyncSession, Depends(get_session)],
+    tenant_id: str | None = None,
+):
+    """Send a verification email to a customer profile."""
+    scoped_tenant = assert_tenant(user, tenant_id)
+    profile = await session.get(CustomerProfile, profile_id)
+    
+    if not profile or profile.tenant_id != scoped_tenant:
+        raise HTTPException(status_code=404, detail="Profile not found")
+    
+    if not profile.email:
+        raise HTTPException(status_code=400, detail="Profile has no email address")
+    
+    if profile.email_verified:
+        return {"status": "already_verified", "email": profile.email}
+    
+    # Create verification token
+    now = datetime.now(timezone.utc)
+    token = EmailVerificationToken(
+        profile_id=profile_id,
+        email=profile.email,
+        expires_at=now + timedelta(hours=24),
+    )
+    session.add(token)
+    await session.flush()
+    
+    # Build verification URL
+    verification_url = f"{settings.APP_URL}/verify-email?token={token.token}"
+    
+    # Send email (if notification service is configured)
+    try:
+        from services.notification import send_email
+        await send_email(
+            to=profile.email,
+            subject="Verify your email address",
+            html_body=f"""
+            <h2>Email Verification</h2>
+            <p>Hi {profile.name},</p>
+            <p>Please verify your email address by clicking the link below:</p>
+            <p><a href="{verification_url}">Verify Email</a></p>
+            <p>This link will expire in 24 hours.</p>
+            """,
+        )
+    except Exception as exc:
+        logger.warning(f"Failed to send verification email: {exc}")
+    
+    await session.commit()
+    return {
+        "status": "verification_email_sent",
+        "email": profile.email,
+        "token": token.token,  # Return token for development/testing
+        "expires_in_hours": 24,
+    }
+
+
+@router.post("/verify-email/confirm")
+async def confirm_email_verification(
+    token: str,
+    session: Annotated[AsyncSession, Depends(get_session)],
+):
+    """Verify an email address using a verification token."""
+    now = datetime.now(timezone.utc)
+    
+    # Find the verification token
+    verification = await session.scalar(
+        select(EmailVerificationToken).where(
+            EmailVerificationToken.token == token,
+            EmailVerificationToken.verified_at.is_(None),
+            EmailVerificationToken.expires_at > now,
+        )
+    )
+    
+    if not verification:
+        raise HTTPException(status_code=400, detail="Invalid or expired verification token")
+    
+    # Mark email as verified
+    profile = await session.get(CustomerProfile, verification.profile_id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profile not found")
+    
+    profile.email_verified = True
+    profile.verified_at = now
+    verification.verified_at = now
+    
+    await session.commit()
+    await session.refresh(profile)
+    
+    return {
+        "status": "email_verified",
+        "profile_id": profile.id,
+        "email": profile.email,
+        "verified_at": profile.verified_at.isoformat(),
+    }
+
+
+@router.get("/verify-email/status/{profile_id}")
+async def get_verification_status(
+    profile_id: str,
+    user: Annotated[User, Depends(require_roles("tenant_admin", "support_agent"))],
+    session: Annotated[AsyncSession, Depends(get_session)],
+    tenant_id: str | None = None,
+):
+    """Get email verification status for a profile."""
+    scoped_tenant = assert_tenant(user, tenant_id)
+    profile = await session.get(CustomerProfile, profile_id)
+    
+    if not profile or profile.tenant_id != scoped_tenant:
+        raise HTTPException(status_code=404, detail="Profile not found")
+    
+    return {
+        "profile_id": profile.id,
+        "email": profile.email,
+        "email_verified": profile.email_verified,
+        "verified_at": profile.verified_at.isoformat() if profile.verified_at else None,
+    }
+
+
+@router.post("/verify-email/confirm-ticket")
+async def confirm_ticket_email_verification(
+    token: str,
+    session: Annotated[AsyncSession, Depends(get_session)],
+):
+    """Verify email and activate ticket using a verification token."""
+    now = datetime.now(timezone.utc)
+    
+    # Find the verification token
+    verification = await session.scalar(
+        select(EmailVerificationToken).where(
+            EmailVerificationToken.token == token,
+            EmailVerificationToken.verified_at.is_(None),
+            EmailVerificationToken.expires_at > now,
+        )
+    )
+    
+    if not verification:
+        raise HTTPException(status_code=400, detail="Invalid or expired verification token")
+    
+    # Mark email as verified
+    profile = await session.get(CustomerProfile, verification.profile_id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profile not found")
+    
+    profile.email_verified = True
+    profile.verified_at = now
+    verification.verified_at = now
+    
+    # Update all pending tickets for this profile
+    pending_tickets = (
+        await session.scalars(
+            select(Ticket).where(
+                Ticket.profile_id == profile.id,
+                Ticket.requires_email_verification.is_(True),
+                Ticket.email_verified.is_(False),
+            )
+        )
+    ).all()
+    
+    for ticket in pending_tickets:
+        ticket.email_verified = True
+        # Re-enable SLA tracking if it was paused
+        if not ticket.status or ticket.status == "pending_verification":
+            ticket.status = "new"
+    
+    await session.commit()
+    
+    return {
+        "status": "email_verified",
+        "profile_id": profile.id,
+        "email": profile.email,
+        "verified_at": profile.verified_at.isoformat(),
+        "tickets_activated": len(pending_tickets),
+        "message": f"Email verified! {len(pending_tickets)} ticket(s) have been activated.",
+    }

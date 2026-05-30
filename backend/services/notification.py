@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import smtplib
+from html import escape
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from typing import Any
@@ -74,7 +75,7 @@ async def _send_email(
         logger.warning("SMTP not configured — skipping email to %s", address)
         # In dev: just log the message
         logger.info("DEV EMAIL to %s:\nSubject: %s\n%s", address, subject, text_body)
-        return False
+        return settings.ENVIRONMENT.lower() != "production" or settings.USE_MOCK_DATA
 
     try:
         msg = MIMEMultipart("alternative")
@@ -104,7 +105,7 @@ async def _send_whatsapp(*, phone: str, body: str, delivery_config: dict[str, An
     if not twilio_sid or not twilio_token or not twilio_phone:
         logger.warning("Twilio not configured — skipping WhatsApp to %s", phone)
         logger.info("DEV WHATSAPP to %s:\n%s", phone, body)
-        return False
+        return settings.ENVIRONMENT.lower() != "production" or settings.USE_MOCK_DATA
 
     try:
         from twilio.rest import Client  # type: ignore
@@ -126,6 +127,10 @@ def build_handoff_email_html(
     chat_url: str,
     intro_message: str,
 ) -> str:
+    customer_name = escape(customer_name or "Customer")
+    intro_message = escape(intro_message or "")
+    ticket_summary = escape(ticket_summary)
+    chat_url = escape(chat_url, quote=True)
     return f"""
 <!DOCTYPE html>
 <html>
@@ -160,6 +165,10 @@ def build_resolution_email_html(
     resolution_note: str,
     csat_url: str,
 ) -> str:
+    customer_name = escape(customer_name or "Customer")
+    ticket_summary = escape(ticket_summary)
+    resolution_note = escape(resolution_note).replace("\n", "<br>")
+    csat_url = escape(csat_url, quote=True)
     return f"""
 <!DOCTYPE html>
 <html>

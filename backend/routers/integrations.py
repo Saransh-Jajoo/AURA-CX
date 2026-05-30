@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import secrets
+from datetime import datetime, timezone, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -10,8 +11,9 @@ from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from config import settings
 from database import get_session
-from models import IntegrationSource, User
+from models import IntegrationSource, PlatformAPIConnection, User
 from security import assert_tenant, hash_password, require_roles, verify_password
 
 router = APIRouter()
@@ -125,6 +127,93 @@ async def remove_integration(
     await session.delete(source)
     await session.commit()
     return {"status": "removed", "id": source_id}
+
+
+@router.get("/integrations/health/{tenant_id}")
+async def check_polling_health(
+    tenant_id: str,
+    user: Annotated[User, Depends(require_roles("tenant_admin", "manager", "executive"))],
+    session: Annotated[AsyncSession, Depends(get_session)],
+):
+    """
+    Health check for email polling connections.
+    Ensures all email integrations are actively polling for new messages.
+    """
+    assert_tenant(user, tenant_id)
+    
+    now = datetime.now(timezone.utc)
+    poll_interval = settings.SOCIAL_MONITOR_POLL_INTERVAL
+    stale_threshold = poll_interval * 3  # 3 missed poll windows
+    
+    # Get all email/IMAP platform connections for this tenant
+    connections = (
+        await session.scalars(
+            select(PlatformAPIConnection).where(
+                PlatformAPIConnection.tenant_id == tenant_id,
+                PlatformAPIConnection.platform_slug.in_({"gmail", "email", "imap"}),
+                PlatformAPIConnection.active.is_(True),
+            )
+        )
+    ).all()
+    
+    health_status = {
+        "tenant_id": tenant_id,
+        "polling_interval_seconds": poll_interval,
+        "check_timestamp": now.isoformat(),
+        "connections_monitored": len(connections),
+        "connections_healthy": 0,
+        "connections_stale": 0,
+        "connections": [],
+        "issues": [],
+    }
+    
+    for connection in connections:
+        last_poll = connection.last_polled_at
+        time_since_poll = (now - last_poll).total_seconds() if last_poll else float("inf")
+        is_stale = time_since_poll > stale_threshold
+        has_error = bool(connection.last_error)
+        
+        connection_status = {
+            "id": connection.id,
+            "platform": connection.platform_slug,
+            "account": connection.account_identifier,
+            "active": connection.active,
+            "last_polled_at": last_poll.isoformat() if last_poll else None,
+            "seconds_since_poll": time_since_poll,
+            "is_stale": is_stale,
+            "has_error": has_error,
+            "last_error": connection.last_error[:200] if connection.last_error else None,
+            "status": "stale" if is_stale else ("error" if has_error else "healthy"),
+        }
+        
+        if not is_stale and not has_error:
+            health_status["connections_healthy"] += 1
+        elif is_stale:
+            health_status["connections_stale"] += 1
+            health_status["issues"].append(
+                f"Connection {connection.id} ({connection.platform_slug}/{connection.account_identifier}) "
+                f"has not been polled for {time_since_poll:.0f}s (threshold: {stale_threshold}s)"
+            )
+        
+        if has_error:
+            health_status["issues"].append(
+                f"Connection {connection.id} ({connection.platform_slug}) has recent error: {connection.last_error[:100]}"
+            )
+        
+        health_status["connections"].append(connection_status)
+    
+    # Overall health determination
+    health_status["overall_status"] = (
+        "healthy" if health_status["connections_healthy"] == len(connections) and len(connections) > 0
+        else "degraded" if health_status["connections_healthy"] > 0
+        else "unhealthy" if len(connections) > 0
+        else "no_connections"
+    )
+    
+    if not connections:
+        health_status["issues"].append("No email polling connections configured for this tenant")
+    
+    return health_status
 
 
 async def verify_webhook_source(session: AsyncSession, tenant_id: str, platform: str, secret: str | None) -> list[IntegrationSource]:

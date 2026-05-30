@@ -26,7 +26,7 @@ from models import (
 from security import assert_tenant, require_roles
 from services.ai_providers import provider_health, tenant_provider_configs
 from services.encryption import encrypt_value, decrypt_value
-from services.platform_polling import poll_due_platform_connections
+from services.platform_polling import poll_due_platform_connections, poll_platform_connection
 
 router = APIRouter()
 
@@ -562,7 +562,7 @@ async def list_dynamic_platform_connections(
 
 @router.post("/settings/platform-api-connections/poll-now")
 async def poll_dynamic_platform_connections_now(
-    user: Annotated[User, Depends(require_roles("executive"))],
+    user: Annotated[User, Depends(require_roles("tenant_admin", "executive"))],
     session: Annotated[AsyncSession, Depends(get_session)],
 ):
     """Run platform polling immediately so users can verify new inbox/API connections."""
@@ -694,6 +694,24 @@ async def update_dynamic_platform_connection(
     await session.commit()
     await session.refresh(connection)
     return {"status": "updated", "connection": _dynamic_platform_to_dict(connection)}
+
+
+@router.post("/settings/platform-api-connections/{connection_id}/poll")
+async def poll_dynamic_platform_connection_now(
+    connection_id: str,
+    user: Annotated[User, Depends(require_roles("tenant_admin", "executive"))],
+    session: Annotated[AsyncSession, Depends(get_session)],
+):
+    """Poll a live platform connection immediately for verification."""
+    connection = await session.get(PlatformAPIConnection, connection_id)
+    if connection is None:
+        raise HTTPException(status_code=404, detail="Platform connection not found")
+    assert_tenant(user, connection.tenant_id)
+    if not connection.active:
+        raise HTTPException(status_code=400, detail="Platform connection is disabled")
+    result = await poll_platform_connection(session, connection)
+    await session.refresh(connection)
+    return {"status": "polled", "result": result, "connection": _dynamic_platform_to_dict(connection)}
 
 
 @router.delete("/settings/platform-api-connections/{connection_id}")

@@ -222,11 +222,26 @@ async def generate_draft(
     *,
     tenant_id: str,
     ticket: dict,
+    customer_context: dict | None = None,
     provider_configs: dict[str, ProviderConfig] | None = None,
     preferred_provider: str | None = None,
     fallback_order: list[str] | None = None,
     brand_tone: str | None = None,
 ) -> dict:
+    """Generate a customized AI draft response for a customer ticket.
+    
+    Args:
+        tenant_id: Tenant ID for context retrieval
+        ticket: Ticket data dict with message, intent, channel, etc.
+        customer_context: Optional customer profile context for personalization
+        provider_configs: AI provider configuration
+        preferred_provider: Preferred AI provider
+        fallback_order: Fallback provider order
+        brand_tone: Brand tone/guidelines for response style
+    
+    Returns:
+        Dict with draft, confidence, auto_approvable, needs_human_detail, rag_sources
+    """
     configured = bool(provider_configs) or any([
         settings.GEMINI_API_KEY,
         settings.OPENAI_API_KEY,
@@ -239,7 +254,19 @@ async def generate_draft(
     if settings.USE_MOCK_DATA or not configured:
         intent = ticket.get("intent", "general inquiry")
         customer = ticket.get("customer_name", "Valued Customer")
-        draft = f"Hi {customer},\n\nThank you for reaching out to AURA-CX support. We have received your {intent.lower()} report and our engineering team is looking into it immediately. We will update you as soon as we have a resolution.\n\nBest regards,\nAURA-CX Copilot"
+        
+        # Add personalization from customer context
+        personalization = ""
+        if customer_context:
+            if customer_context.get("churn_risk", 0) > 0.7:
+                personalization = " We highly value your business and want to resolve this quickly."
+            elif customer_context.get("ltv", 0) > 1000:
+                personalization = " As a valued long-term customer, we appreciate your patience."
+            
+            if customer_context.get("plan"):
+                personalization += f" Your {customer_context['plan']} plan includes priority support."
+        
+        draft = f"Hi {customer},\n\nThank you for reaching out to AURA-CX support. We have received your {intent.lower()} report and our engineering team is looking into it immediately.{personalization} We will update you as soon as we have a resolution.\n\nBest regards,\nAURA-CX Copilot"
         return {
             "draft": draft,
             "confidence": 0.9,
@@ -248,16 +275,57 @@ async def generate_draft(
             "rag_sources": [],
         }
 
+    # Build customer context for the prompt
+    customer_info = ""
+    if customer_context:
+        segments = []
+        
+        # Customer tier/segment
+        if customer_context.get("customer_segment"):
+            segments.append(f"Customer Segment: {customer_context['customer_segment']}")
+        
+        # LTV and churn risk
+        ltv = float(customer_context.get("ltv", 0))
+        churn_risk = float(customer_context.get("churn_risk", 0))
+        if ltv > 0:
+            segments.append(f"Lifetime Value: ${ltv:.2f}")
+        if churn_risk > 0:
+            segments.append(f"Churn Risk: {churn_risk:.1%}")
+        
+        # Customer plan
+        if customer_context.get("plan"):
+            segments.append(f"Plan: {customer_context['plan']}")
+        
+        # Previous interaction history
+        history = customer_context.get("ticket_interaction_history", [])
+        if history:
+            segments.append(f"Previous Interactions: {len(history)} tickets")
+            # Include recent resolution context
+            recent = [h for h in history[-3:] if h]  # Last 3 interactions
+            if recent:
+                recent_intents = ", ".join(set(str(h.get("intent", "")).title() for h in recent if h.get("intent")))
+                if recent_intents:
+                    segments.append(f"Recent Issues: {recent_intents}")
+        
+        # Tags/notes
+        if customer_context.get("tags"):
+            segments.append(f"Tags: {', '.join(customer_context['tags'][:5])}")
+        
+        if segments:
+            customer_info = "\n\nCustomer Profile:\n" + "\n".join(segments)
+
     query_embedding = await embed_text(ticket.get("message", ""))
     context_docs = await retrieve_rag_context(tenant_id=tenant_id, query_embedding=query_embedding)
     context = "\n\n".join(
         f"[{doc['id']}] {doc['title']}\n{doc.get('body') or doc.get('source_uri') or ''}"
         for doc in context_docs
     )
+    
     prompt = f"""
-You are AURA-CX, an expert enterprise support copilot.
+You are AURA-CX, an expert enterprise support copilot creating customized responses.
 Use only tenant knowledge context below. If context is insufficient, say what you need from the agent.
 Draft a concise, empathetic response suitable for the customer channel.
+PERSONALIZE the response based on the customer profile when provided.
 Do not reveal internal policy IDs unless they help the agent verify the source.
 This system is human-in-the-loop: never claim the response has been sent, approved, resolved, or executed.
 If tenant knowledge is missing or weak, set confidence to 0.45 or lower and needs_human_detail to true.
@@ -272,11 +340,21 @@ Ticket:
 Channel: {ticket.get("channel")}
 Customer: {_sanitize_user_input(ticket.get("customer_name", ""))}
 Product: {_sanitize_user_input(ticket.get("product", ""))}
-Message: {_sanitize_user_input(ticket.get("message", ""))}
+Intent: {_sanitize_user_input(ticket.get("intent", ""))}
+Sentiment: {_sanitize_user_input(ticket.get("sentiment", ""))}
+Message: {_sanitize_user_input(ticket.get("message", ""))}{customer_info}
+
+Guidelines:
+- Address customer by name when possible
+- Reference their specific issue and intent
+- If they are a high-value customer (high LTV or low churn risk), emphasize priority handling
+- If they show churn risk, express commitment to resolution and satisfaction
+- Include relevant product plan details if applicable
+- Reference previous issues if they are repeat complaints
 
 Return strict JSON:
 {{
-  "draft": "customer-ready draft",
+  "draft": "customer-ready draft personalized to their context",
   "confidence": 0.0,
   "auto_approvable": false,
   "needs_human_detail": true

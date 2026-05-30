@@ -8,7 +8,7 @@ import {
   Shield, RefreshCw, Copy, Eye, EyeOff, CheckCircle2, XCircle,
   AlertCircle, ExternalLink, Zap, Hash, Inbox, MessageSquare,
 } from "lucide-react";
-import { fetchPlatformConnections, updatePlatformConnection } from "@/lib/api";
+import { fetchPlatformConnections, pollPlatformConnectionsNow, updatePlatformConnection } from "@/lib/api";
 import type { PlatformConnections, XPlatformStatus, RedditPlatformStatus, GmailPlatformStatus, ThreadsPlatformStatus } from "@/lib/types";
 
 type AnyPlatformStatus = XPlatformStatus | RedditPlatformStatus | GmailPlatformStatus | ThreadsPlatformStatus;

@@ -101,6 +101,10 @@ export async function escalateTicket(id: string) {
   return request(`/api/v1/tickets/${id}/escalate`, { method: "POST" });
 }
 
+export async function ignoreTicket(id: string) {
+  return request<{ status: string; ticket: Record<string, unknown> }>(`/api/v1/tickets/${id}/ignore`, { method: "POST" });
+}
+
 export async function draftTicket(id: string): Promise<AIDraftResponse> {
   return request(`/api/v1/tickets/${id}/draft`, { method: "POST" });
 }
@@ -320,6 +324,27 @@ export async function deleteDynamicPlatformConnection(connectionId: string) {
   );
 }
 
+export async function pollDynamicPlatformConnection(connectionId: string) {
+  return request<{
+    status: string;
+    result: { new_mentions: number; new_complaints: number; tickets_created: number };
+    connection: import("./types").DynamicPlatformConnection;
+  }>(
+    `/api/v1/settings/platform-api-connections/${connectionId}/poll`,
+    { method: "POST" }
+  );
+}
+
+export async function pollPlatformConnectionsNow() {
+  return request<{
+    status: string;
+    connections_polled: number;
+    new_mentions: number;
+    new_complaints: number;
+    tickets_created: number;
+  }>("/api/v1/settings/platform-api-connections/poll-now", { method: "POST" });
+}
+
 // ── Voice / Call Recordings ─────────────────────────────────
 export async function fetchCalls(params?: { status?: string }) {
   const qs = params?.status ? `?status=${params.status}` : "";
@@ -468,4 +493,3 @@ export async function fetchRecommendations(): Promise<{
 }> {
   return request("/api/v1/analytics/recommendations");
 }
-

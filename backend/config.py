@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "production"
     API_VERSION: str = "2.0.0"
     FRONTEND_URL: str = "http://localhost:3000"
+    APP_URL: str = "http://localhost:3000"  # Used for email verification links
 
     DATABASE_URL: str = "postgresql+asyncpg://aura:aura@postgres:5432/aura_cx"
 

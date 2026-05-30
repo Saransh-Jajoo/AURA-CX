@@ -11,10 +11,11 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import settings
-from models import IntegrationSource, PlatformAPIConnection, SocialMention, SocialMonitorConfig
+from models import IntegrationSource, PlatformAPIConnection, SocialMention, SocialMonitorConfig, TenantConfig
 from routers.ingestion import WebhookPayload, process_webhook_payload
 from services.complaint_classifier import classify_mention
 from services.encryption import decrypt_value
+from services.encryption import encrypt_value
 from services.social_monitor import (
     MonitorError,
     poll_email_inbox,
@@ -101,6 +102,10 @@ def _load_credentials(connection: PlatformAPIConnection) -> dict[str, Any]:
     return json.loads(decrypt_value(connection.credentials_enc))
 
 
+def _is_email_platform(platform: str) -> bool:
+    return platform.lower() in {"gmail", "email", "imap"}
+
+
 def _poll_due(connection: PlatformAPIConnection, now: datetime) -> bool:
     if not connection.last_polled_at:
         return True
@@ -177,6 +182,44 @@ async def _classify_safely(content: str, platform: str, author_handle: str) -> d
     return classification
 
 
+async def _promote_mention_to_ticket(
+    *,
+    session: AsyncSession,
+    connection: PlatformAPIConnection,
+    mention: SocialMention,
+    sources: list[IntegrationSource],
+    post: dict[str, Any] | None = None,
+) -> bool:
+    post = post or ((mention.raw_metadata or {}).get("post") if isinstance(mention.raw_metadata, dict) else {}) or {}
+    payload = WebhookPayload(
+        channel=connection.platform_slug,
+        raw_content=mention.content,
+        sender_id=mention.author_handle,
+        sender_name=mention.author_name or mention.author_handle,
+        external_id=mention.external_id,
+        metadata={
+            "target_account": connection.account_identifier,
+            "dynamic_platform_connection_id": connection.id,
+            "source_url": post.get("url") or mention.content_url,
+            "email": post.get("sender_email") or post.get("reply_to") or mention.author_handle,
+            "sender_email": post.get("sender_email") or mention.author_handle,
+            "reply_to": post.get("reply_to"),
+            "subject": post.get("subject"),
+            "imap_uid": post.get("imap_uid"),
+        },
+    )
+    ticket = await process_webhook_payload(
+        session=session,
+        tenant_id=connection.tenant_id,
+        channel=connection.platform_slug,
+        payload=payload,
+        sources=sources,
+    )
+    mention.promoted_to_ticket_id = ticket.id
+    mention.promoted_at = datetime.now(timezone.utc)
+    return True
+
+
 async def _runtime_rows(
     session: AsyncSession,
     connection: PlatformAPIConnection,
@@ -194,12 +237,127 @@ async def _runtime_rows(
     return monitor, list(sources)
 
 
-async def poll_platform_connection(session: AsyncSession, connection: PlatformAPIConnection) -> dict[str, int]:
-    """Poll one encrypted connection and promote live complaints to tickets."""
+async def _ensure_runtime_rows(
+    session: AsyncSession,
+    connection: PlatformAPIConnection,
+) -> tuple[SocialMonitorConfig, list[IntegrationSource]]:
     monitor, sources = await _runtime_rows(session, connection)
     if monitor is None:
-        connection.last_error = "Missing monitor runtime row"
-        return {"new_mentions": 0, "new_complaints": 0, "tickets_created": 0}
+        monitor = SocialMonitorConfig(
+            tenant_id=connection.tenant_id,
+            platform=connection.platform_slug,
+            target_type="inbox" if _is_email_platform(connection.platform_slug) else "account",
+            target_value=connection.account_identifier,
+            label=f"{connection.platform_name} live account",
+            active=connection.active,
+        )
+        session.add(monitor)
+        await session.flush()
+        connection.monitor_config_id = monitor.id
+
+    if not sources:
+        source = IntegrationSource(
+            tenant_id=connection.tenant_id,
+            platform=connection.platform_slug,
+            identifier=connection.account_identifier,
+            label=f"{connection.platform_name} inbox" if _is_email_platform(connection.platform_slug) else f"{connection.platform_name} official account",
+            active=connection.active,
+            filters={"dynamic_platform_connection_id": connection.id},
+        )
+        session.add(source)
+        await session.flush()
+        connection.integration_source_id = source.id
+        sources = [source]
+
+    return monitor, sources
+
+
+async def _ensure_legacy_gmail_connections(session: AsyncSession) -> None:
+    """Mirror tenant Gmail settings into pollable platform connections."""
+    configs = (
+        await session.scalars(
+            select(TenantConfig).where(
+                TenantConfig.gmail_imap_host.is_not(None),
+                TenantConfig.gmail_imap_user_enc.is_not(None),
+                TenantConfig.gmail_imap_pass_enc.is_not(None),
+            )
+        )
+    ).all()
+    for config in configs:
+        user = decrypt_value(config.gmail_imap_user_enc or "").strip()
+        password = decrypt_value(config.gmail_imap_pass_enc or "")
+        if not user or not password:
+            continue
+        credentials = {
+            "imap_host": config.gmail_imap_host or "imap.gmail.com",
+            "imap_port": config.gmail_imap_port or 993,
+            "imap_user": user,
+            "imap_password": password,
+            "imap_use_ssl": True,
+            "folder": "INBOX",
+            "max_results": 50,
+        }
+        connection = await session.scalar(
+            select(PlatformAPIConnection).where(
+                PlatformAPIConnection.tenant_id == config.tenant_id,
+                PlatformAPIConnection.platform_slug == "gmail",
+                PlatformAPIConnection.account_identifier == user,
+            )
+        )
+        if connection is None:
+            connection = PlatformAPIConnection(
+                tenant_id=config.tenant_id,
+                platform_name="Gmail",
+                platform_slug="gmail",
+                account_identifier=user,
+                credentials_enc=encrypt_value(json.dumps(credentials)),
+                active=True,
+                poll_interval_seconds=300,
+            )
+            session.add(connection)
+            await session.flush()
+        else:
+            connection.active = True
+            connection.credentials_enc = encrypt_value(json.dumps(credentials))
+        await _ensure_runtime_rows(session, connection)
+
+    env_user = (settings.IMAP_USER or settings.SMTP_USER or "").strip()
+    env_pass = (settings.IMAP_PASSWORD or settings.SMTP_PASS or "").strip()
+    if env_user and env_pass:
+        credentials = {
+            "imap_host": settings.IMAP_HOST or "imap.gmail.com",
+            "imap_port": settings.IMAP_PORT or 993,
+            "imap_user": env_user,
+            "imap_password": env_pass,
+            "imap_use_ssl": settings.IMAP_USE_SSL,
+            "folder": "INBOX",
+            "max_results": 50,
+        }
+        connection = await session.scalar(
+            select(PlatformAPIConnection).where(
+                PlatformAPIConnection.tenant_id == settings.BOOTSTRAP_TENANT_ID,
+                PlatformAPIConnection.platform_slug == "gmail",
+                PlatformAPIConnection.account_identifier == env_user,
+            )
+        )
+        if connection is None:
+            connection = PlatformAPIConnection(
+                tenant_id=settings.BOOTSTRAP_TENANT_ID,
+                platform_name="Gmail",
+                platform_slug="gmail",
+                account_identifier=env_user,
+                credentials_enc=encrypt_value(json.dumps(credentials)),
+                active=True,
+                poll_interval_seconds=settings.SOCIAL_MONITOR_POLL_INTERVAL,
+            )
+            session.add(connection)
+            await session.flush()
+        await _ensure_runtime_rows(session, connection)
+
+
+async def poll_platform_connection(session: AsyncSession, connection: PlatformAPIConnection) -> dict[str, int]:
+    """Poll one encrypted connection and promote live complaints to tickets."""
+    monitor, sources = await _ensure_runtime_rows(session, connection)
 
     credentials = _load_credentials(connection)
     result = await _poll_connection_api(connection, credentials)
@@ -214,14 +372,23 @@ async def poll_platform_connection(session: AsyncSession, connection: PlatformAP
         external_id = str(post.get("id") or "")
         if not external_id:
             continue
-        exists = await session.scalar(
-            select(SocialMention.id).where(
+        existing_mention = await session.scalar(
+            select(SocialMention).where(
                 SocialMention.external_id == external_id,
                 SocialMention.platform == connection.platform_slug,
                 SocialMention.tenant_id == connection.tenant_id,
             )
         )
-        if exists:
+        if existing_mention:
+            if _is_email_platform(connection.platform_slug) and not existing_mention.promoted_to_ticket_id:
+                if await _promote_mention_to_ticket(
+                    session=session,
+                    connection=connection,
+                    mention=existing_mention,
+                    sources=sources,
+                    post=post,
+                ):
+                    tickets_created += 1
             continue
 
         content = str(post.get("text") or "")[:10000]
@@ -249,30 +416,44 @@ async def poll_platform_connection(session: AsyncSession, connection: PlatformAP
         await session.flush()
         new_mentions += 1
 
-        if mention.is_complaint and mention.complaint_confidence >= settings.COMPLAINT_CONFIDENCE_THRESHOLD:
+        should_create_ticket = _is_email_platform(connection.platform_slug) or (
+            mention.is_complaint and mention.complaint_confidence >= settings.COMPLAINT_CONFIDENCE_THRESHOLD
+        )
+        if should_create_ticket:
             new_complaints += 1
-            payload = WebhookPayload(
-                channel=connection.platform_slug,
-                raw_content=content,
-                sender_id=author_handle,
-                sender_name=post.get("author_name") or author_handle,
-                external_id=external_id,
-                metadata={
-                    "target_account": connection.account_identifier,
-                    "dynamic_platform_connection_id": connection.id,
-                    "source_url": post.get("url"),
-                },
-            )
-            ticket = await process_webhook_payload(
+            if await _promote_mention_to_ticket(
                 session=session,
-                tenant_id=connection.tenant_id,
-                channel=connection.platform_slug,
-                payload=payload,
+                connection=connection,
+                mention=mention,
                 sources=sources,
+                post=post,
+            ):
+                tickets_created += 1
+
+    # Auto-promote any existing email/gmail mentions that do not have a ticket
+    if _is_email_platform(connection.platform_slug):
+        unpromoted = (
+            await session.scalars(
+                select(SocialMention).where(
+                    SocialMention.platform == connection.platform_slug,
+                    SocialMention.tenant_id == connection.tenant_id,
+                    SocialMention.promoted_to_ticket_id.is_(None),
+                )
             )
-            mention.promoted_to_ticket_id = ticket.id
-            mention.promoted_at = datetime.now(timezone.utc)
-            tickets_created += 1
+        ).all()
+        for old_mention in unpromoted:
+            try:
+                post_data = ((old_mention.raw_metadata or {}).get("post") if isinstance(old_mention.raw_metadata, dict) else {}) or {}
+                if await _promote_mention_to_ticket(
+                    session=session,
+                    connection=connection,
+                    mention=old_mention,
+                    sources=sources,
+                    post=post_data,
+                ):
+                    tickets_created += 1
+            except Exception as exc:
+                logger.error("Failed to promote old email mention %s: %s", old_mention.id, exc)
 
     if newest_id:
         connection.poll_cursor = str(newest_id)
@@ -287,6 +468,7 @@ async def poll_platform_connection(session: AsyncSession, connection: PlatformAP
 
 async def poll_due_platform_connections(session: AsyncSession) -> dict[str, int]:
     now = datetime.now(timezone.utc)
+    await _ensure_legacy_gmail_connections(session)
     connections = (
         await session.scalars(
             select(PlatformAPIConnection).where(PlatformAPIConnection.active.is_(True))

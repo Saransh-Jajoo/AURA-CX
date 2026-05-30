@@ -6,6 +6,12 @@ KB re-indexing, voice transcript processing, and social media monitoring.
 
 from celery import Celery
 from config import settings
+import sys
+import os
+
+# Ensure current working directory is on sys.path so celery worker
+# child processes can import local modules (e.g. database.py).
+sys.path.insert(0, os.getcwd())
 
 celery_app = Celery(
     "aura_cx",
@@ -58,34 +64,37 @@ celery_app.conf.update(
 def scan_sla_breaches():
     """Periodic scan for SLA breaches and escalation triggers."""
     import asyncio
-    from database import SessionLocal
+    from database import SessionLocal, engine
     from services.sla_engine import sla_status
 
     async def _scan():
-        async with SessionLocal() as db:
-            from sqlalchemy import select, and_
-            from models import Ticket
+        try:
+            async with SessionLocal() as db:
+                from sqlalchemy import select, and_
+                from models import Ticket
 
-            stmt = select(Ticket).where(
-                and_(
-                    Ticket.status.in_(["new", "in_progress", "awaiting_reply"]),
-                    Ticket.sla_deadline.isnot(None),
+                stmt = select(Ticket).where(
+                    and_(
+                        Ticket.status.in_(["new", "in_progress", "awaiting_reply"]),
+                        Ticket.sla_deadline.isnot(None),
+                    )
                 )
-            )
-            result = await db.execute(stmt)
-            active_tickets = result.scalars().all()
+                result = await db.execute(stmt)
+                active_tickets = result.scalars().all()
 
-            breached = []
-            for ticket in active_tickets:
-                status = sla_status(ticket)
-                if status["breached"] and not ticket.sla_breached:
-                    ticket.sla_breached = True
-                    breached.append(ticket.id)
+                breached = []
+                for ticket in active_tickets:
+                    status = sla_status(ticket)
+                    if status["breached"] and not ticket.sla_breached:
+                        ticket.sla_breached = True
+                        breached.append(ticket.id)
 
-            if breached:
-                await db.commit()
+                if breached:
+                    await db.commit()
 
-            return {"scanned": len(active_tickets), "breached": len(breached)}
+                return {"scanned": len(active_tickets), "breached": len(breached)}
+        finally:
+            await engine.dispose()
 
     return asyncio.run(_scan())
 
@@ -95,28 +104,31 @@ def scan_sla_breaches():
 def evaluate_campaign_triggers():
     """Evaluate pending campaign triggers and mark eligible ones for execution."""
     import asyncio
-    from database import SessionLocal
+    from database import SessionLocal, engine
 
     async def _evaluate():
-        async with SessionLocal() as db:
-            from sqlalchemy import select
-            from models import CampaignTrigger
+        try:
+            async with SessionLocal() as db:
+                from sqlalchemy import select
+                from models import CampaignTrigger
 
-            stmt = select(CampaignTrigger).where(CampaignTrigger.status == "pending")
-            result = await db.execute(stmt)
-            pending = result.scalars().all()
+                stmt = select(CampaignTrigger).where(CampaignTrigger.status == "pending")
+                result = await db.execute(stmt)
+                pending = result.scalars().all()
 
-            evaluated = 0
-            for trigger in pending:
-                # Auto-approve low-risk triggers
-                if trigger.trigger_type in ("follow_up", "satisfaction_survey"):
-                    trigger.status = "approved"
-                    evaluated += 1
+                evaluated = 0
+                for trigger in pending:
+                    # Auto-approve low-risk triggers
+                    if trigger.trigger_type in ("follow_up", "satisfaction_survey"):
+                        trigger.status = "approved"
+                        evaluated += 1
 
-            if evaluated:
-                await db.commit()
+                if evaluated:
+                    await db.commit()
 
-            return {"pending": len(pending), "auto_approved": evaluated}
+                return {"pending": len(pending), "auto_approved": evaluated}
+        finally:
+            await engine.dispose()
 
     return asyncio.run(_evaluate())
 
@@ -126,29 +138,32 @@ def evaluate_campaign_triggers():
 def reindex_kb_document(document_id: str, tenant_id: str):
     """Re-chunk and re-embed a knowledge base document."""
     import asyncio
-    from database import SessionLocal
+    from database import SessionLocal, engine
 
     async def _reindex():
-        async with SessionLocal() as db:
-            from sqlalchemy import select
-            from models import KnowledgeDocument
-            from datetime import datetime, timezone
+        try:
+            async with SessionLocal() as db:
+                from sqlalchemy import select
+                from models import KnowledgeDocument
+                from datetime import datetime, timezone
 
-            stmt = select(KnowledgeDocument).where(
-                KnowledgeDocument.id == document_id,
-                KnowledgeDocument.tenant_id == tenant_id,
-            )
-            result = await db.execute(stmt)
-            doc = result.scalar_one_or_none()
+                stmt = select(KnowledgeDocument).where(
+                    KnowledgeDocument.id == document_id,
+                    KnowledgeDocument.tenant_id == tenant_id,
+                )
+                result = await db.execute(stmt)
+                doc = result.scalar_one_or_none()
 
-            if not doc:
-                return {"error": "Document not found"}
+                if not doc:
+                    return {"error": "Document not found"}
 
-            # Mark as re-indexed
-            doc.last_indexed_at = datetime.now(timezone.utc)
-            await db.commit()
+                # Mark as re-indexed
+                doc.last_indexed_at = datetime.now(timezone.utc)
+                await db.commit()
 
-            return {"document_id": document_id, "status": "reindexed"}
+                return {"document_id": document_id, "status": "reindexed"}
+        finally:
+            await engine.dispose()
 
     return asyncio.run(_reindex())
 
@@ -158,24 +173,27 @@ def reindex_kb_document(document_id: str, tenant_id: str):
 def process_voice_transcript(call_id: str, tenant_id: str):
     """Process and analyze a voice call transcript with AI."""
     import asyncio
-    from database import SessionLocal
+    from database import SessionLocal, engine
 
     async def _process():
-        async with SessionLocal() as db:
-            from sqlalchemy import select
-            from models import CallRecording
+        try:
+            async with SessionLocal() as db:
+                from sqlalchemy import select
+                from models import CallRecording
 
-            stmt = select(CallRecording).where(
-                CallRecording.id == call_id,
-                CallRecording.tenant_id == tenant_id,
-            )
-            result = await db.execute(stmt)
-            call = result.scalar_one_or_none()
+                stmt = select(CallRecording).where(
+                    CallRecording.id == call_id,
+                    CallRecording.tenant_id == tenant_id,
+                )
+                result = await db.execute(stmt)
+                call = result.scalar_one_or_none()
 
-            if not call:
-                return {"error": "Call not found"}
+                if not call:
+                    return {"error": "Call not found"}
 
-            return {"call_id": call_id, "status": "processed"}
+                return {"call_id": call_id, "status": "processed"}
+        finally:
+            await engine.dispose()
 
     return asyncio.run(_process())
 
@@ -185,13 +203,16 @@ def process_voice_transcript(call_id: str, tenant_id: str):
 def poll_social_mentions(self):
     """Periodic task: poll tenant-scoped dynamic platform connections."""
     import asyncio
-    from database import SessionLocal
+    from database import SessionLocal, engine
 
     async def _poll():
         from services.platform_polling import poll_due_platform_connections
 
-        async with SessionLocal() as db:
-            return await poll_due_platform_connections(db)
+        try:
+            async with SessionLocal() as db:
+                return await poll_due_platform_connections(db)
+        finally:
+            await engine.dispose()
 
     try:
         return asyncio.run(_poll())
